@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dota 2 MMR Dashboard - Test</title>
+  <style>
+    body {
+      font-family: monospace, system-ui, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background: #1e293b;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+    }
+    .status { font-weight: bold; }
+    .ok { color: #4ade80; }
+    .err { color: #f87171; }
+    pre {
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      max-height: 300px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Frontend Deployment Test</h2>
+    <p>GitHub Pages Status: <span class="status ok">Online</span></p>
+    <p>Data Feed Status: <span id="feedStatus" class="status">Fetching ./matches.json...</span></p>
+    <p>Total Matches: <strong id="matchCount">0</strong></p>
+
+    <h3>Raw Data Preview:</h3>
+    <pre id="output">Loading...</pre>
+  </div>
+
+  <script>
+    async function testFeed() {
+      const feedStatus = document.getElementById('feedStatus');
+      const matchCount = document.getElementById('matchCount');
+      const output = document.getElementById('output');
+
+      try {
+        // Fetches matches.json relative to the current site root
+        const res = await fetch('./matches.json', { cache: 'no-store' });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: Could not locate matches.json`);
+        }
+
+        const data = await res.json();
+        
+        feedStatus.textContent = 'Connected successfully';
+        feedStatus.className = 'status ok';
+        matchCount.textContent = Array.isArray(data) ? data.length : 0;
+        output.textContent = JSON.stringify(data[0] || data, null, 2);
+      } catch (err) {
+        feedStatus.textContent = 'Failed to load file';
+        feedStatus.className = 'status err';
+        output.textContent = err.message;
+      }
+    }
+
+    testFeed();
+  </script>
+</body>
+</html>
