@@ -1,0 +1,49 @@
+name: Daily Dota 2 MMR Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Required for AWS OIDC
+  contents: write   # Required to commit matches.json
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run Tracker
+        env:
+          SSM_PARAM_NAME: "/spr_steam/secrets"
+          AWS_REGION: "us-west-2"
+        run: |
+          dotnet run --project Tracker.csproj
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add matches.json
+          
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto-sync Dota 2 match history [skip ci]"
+            git push
+          else
+            echo "No new matches found. Skipping commit."
+          fi
