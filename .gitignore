@@ -1,0 +1,6 @@
+bin/
+obj/
+cellid.txt
+servers_list.bin
+*.auth
+*.csv
