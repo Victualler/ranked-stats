@@ -25,11 +25,9 @@ class Program {
     static CallbackManager manager = null!;
     static SteamGameCoordinator coordinator = null!;
     static SteamUser steamUser = null!;
-    static SteamFriends steamFriends = null!;
 
     static bool dotaSessionStarted = false;
     static readonly object launchLock = new();
-    static TaskCompletionSource<bool> personaCheckTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     static CancellationTokenSource globalCts = new(TimeSpan.FromMinutes(25));
 
     static string user = string.Empty;
@@ -87,13 +85,11 @@ class Program {
         manager = new CallbackManager(steamClient);
         steamUser = steamClient.GetHandler<SteamUser>()!;
         coordinator = steamClient.GetHandler<SteamGameCoordinator>()!;
-        steamFriends = steamClient.GetHandler<SteamFriends>()!;
 
         manager.Subscribe<SteamClient.ConnectedCallback>(OnConnected);
         manager.Subscribe<SteamClient.DisconnectedCallback>(OnDisconnected);
         manager.Subscribe<SteamUser.LoggedOnCallback>(OnLoggedOn);
         manager.Subscribe<SteamUser.LoggedOffCallback>(OnLoggedOff);
-        manager.Subscribe<SteamFriends.PersonaStateCallback>(OnPersonaState);
         manager.Subscribe<SteamGameCoordinator.MessageCallback>(OnGCMessage);
 
         isRunning = true;
@@ -340,31 +336,8 @@ class Program {
             return;
         }
 
-        Console.WriteLine("Logged in! Checking for active game sessions...");
-        steamFriends.RequestFriendInfo(steamUser.SteamID!, EClientPersonaStateFlag.Status | EClientPersonaStateFlag.GameExtraInfo);
-
-        // Explicitly await persona data up to 5 seconds
-        var completedTask = await Task.WhenAny(personaCheckTcs.Task, Task.Delay(5000));
-
-        if (completedTask == personaCheckTcs.Task && await personaCheckTcs.Task) {
-            Console.WriteLine("Active game session confirmed. Aborting sync.");
-            isRunning = false;
-            steamClient.Disconnect();
-            Environment.Exit(0);
-            return;
-        }
-
+        Console.WriteLine("Logged in! Launching Dota 2 session...");
         LaunchDotaSession();
-    }
-
-    static void OnPersonaState(SteamFriends.PersonaStateCallback callback) {
-        if (callback.FriendID == steamUser.SteamID) {
-            bool isPlaying = callback.GameID != null && callback.GameID.AppID != 0;
-            if (isPlaying) {
-                Console.WriteLine($"Active game detected: AppID {callback.GameID!.AppID} ('{callback.GameName}').");
-            }
-            personaCheckTcs.TrySetResult(isPlaying);
-        }
     }
 
     static void LaunchDotaSession() {
@@ -394,7 +367,19 @@ class Program {
     }
 
     static void OnLoggedOff(SteamUser.LoggedOffCallback callback) {
-        Console.WriteLine("Logged off of Steam");
+        Console.WriteLine($"Logged off of Steam: {callback.Result}");
+
+        // If kicked because your desktop client is running, skip cleanly with code 0
+        if (callback.Result == EResult.LoggedInElsewhere ||
+            callback.Result == EResult.LogOnSessionReplaced ||
+            callback.Result == EResult.AlreadyLoggedInElsewhere) {
+            Console.WriteLine("Desktop session is currently active. Skipping sync until next run.");
+            isRunning = false;
+            steamClient.Disconnect();
+            Environment.Exit(0);
+            return;
+        }
+
         isRunning = false;
         steamClient.Disconnect();
     }
