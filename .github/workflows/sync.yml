@@ -1,4 +1,4 @@
-name: Daily Dota 2 MMR Sync
+name: Ranked Stats Sync
 
 on:
   schedule:
