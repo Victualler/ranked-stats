@@ -371,7 +371,7 @@ class Program {
 
         // If kicked because your desktop client is running, skip cleanly with code 0
         if (callback.Result == EResult.LoggedInElsewhere ||
-            callback.Result == EResult.LogOnSessionReplaced ||
+            callback.Result == EResult.LogonSessionReplaced ||
             callback.Result == EResult.AlreadyLoggedInElsewhere) {
             Console.WriteLine("Desktop session is currently active. Skipping sync until next run.");
             isRunning = false;
