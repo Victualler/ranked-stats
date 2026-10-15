@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,10 +22,16 @@ class Program {
     const int APPID = 570; // Dota 2 AppID
     const string OUTPUT_FILE = "matches.json";
 
-    static SteamClient steamClient;
-    static CallbackManager manager;
-    static SteamGameCoordinator coordinator;
-    static SteamUser steamUser;
+    static SteamClient steamClient = null!;
+    static CallbackManager manager = null!;
+    static SteamGameCoordinator coordinator = null!;
+    static SteamUser steamUser = null!;
+    static SteamFriends steamFriends = null!;
+
+    static bool dotaSessionStarted = false;
+    static readonly object launchLock = new();
+    static TaskCompletionSource<bool> personaCheckTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    static CancellationTokenSource globalCts = new(TimeSpan.FromMinutes(9));
 
     static string user = string.Empty;
     static string pass = string.Empty;
@@ -89,13 +95,15 @@ class Program {
 
         steamClient = new SteamClient(configuration);
         manager = new CallbackManager(steamClient);
-        steamUser = steamClient.GetHandler<SteamUser>();
-        coordinator = steamClient.GetHandler<SteamGameCoordinator>();
+        steamUser = steamClient.GetHandler<SteamUser>()!;
+        coordinator = steamClient.GetHandler<SteamGameCoordinator>()!;
+        steamFriends = steamClient.GetHandler<SteamFriends>()!;
 
         manager.Subscribe<SteamClient.ConnectedCallback>(OnConnected);
         manager.Subscribe<SteamClient.DisconnectedCallback>(OnDisconnected);
         manager.Subscribe<SteamUser.LoggedOnCallback>(OnLoggedOn);
         manager.Subscribe<SteamUser.LoggedOffCallback>(OnLoggedOff);
+        manager.Subscribe<SteamFriends.PersonaStateCallback>(OnPersonaState);
         manager.Subscribe<SteamGameCoordinator.MessageCallback>(OnGCMessage);
 
         isRunning = true;
@@ -104,8 +112,14 @@ class Program {
         Console.WriteLine("Connecting to Steam...");
         steamClient.Connect();
 
-        while (isRunning) {
+        while (isRunning && !globalCts.Token.IsCancellationRequested) {
             manager.RunWaitCallbacks(TimeSpan.FromSeconds(1));
+        }
+
+        if (globalCts.Token.IsCancellationRequested && isRunning) {
+            Console.Error.WriteLine("Execution timed out after 9 minutes. Disconnecting.");
+            steamClient.Disconnect();
+            return 1;
         }
 
         // 6. Merge, sort, and save matches
@@ -148,7 +162,6 @@ class Program {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Add("User-Agent", "Dota2Tracker/1.0");
 
-            // OpenDota constants repository updates automatically on every Dota 2 patch
             string json = await client.GetStringAsync("https://raw.githubusercontent.com/odota/dotaconstants/master/build/heroes.json");
             using var doc = JsonDocument.Parse(json);
 
@@ -178,7 +191,6 @@ class Program {
             ssmParamName = envParamName;
         }
 
-        // Attempt AWS SSM Parameter Store resolution
         try {
             var regionName = Environment.GetEnvironmentVariable("AWS_REGION") ?? Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION") ?? "us-east-1";
             var region = RegionEndpoint.GetBySystemName(regionName);
@@ -206,13 +218,11 @@ class Program {
             Console.WriteLine($"AWS SSM fetch skipped or failed: {ex.Message}. Falling back to environment variables.");
         }
 
-        // Fallback: Environment Variables
         user = Environment.GetEnvironmentVariable("STEAM_USER") ?? string.Empty;
         pass = Environment.GetEnvironmentVariable("STEAM_PASSWORD") ?? string.Empty;
         refreshToken = Environment.GetEnvironmentVariable("STEAM_REFRESH_TOKEN") ?? string.Empty;
         sharedSecret = Environment.GetEnvironmentVariable("STEAM_SHARED_SECRET") ?? string.Empty;
 
-        // Fallback: Local .auth file
         if (string.IsNullOrEmpty(refreshToken) && !string.IsNullOrEmpty(user) && File.Exists($"{user}.auth")) {
             refreshToken = File.ReadAllText($"{user}.auth", System.Text.Encoding.ASCII).Trim();
             Console.WriteLine($"Loaded refresh token from local {user}.auth file.");
@@ -308,7 +318,6 @@ class Program {
         if (callback.Result != EResult.OK) {
             Console.WriteLine($"Unable to logon to Steam: {callback.Result} / {callback.ExtendedResult}");
 
-            // Self-healing: if token expired/invalid, re-authenticate using password + TOTP shared secret
             if ((callback.Result == EResult.InvalidPassword || callback.Result == EResult.Expired) &&
                 !string.IsNullOrEmpty(pass) && !string.IsNullOrEmpty(sharedSecret)) {
                 Console.WriteLine("Refresh token expired. Attempting automated re-authentication with sharedSecret...");
@@ -343,20 +352,57 @@ class Program {
         File.WriteAllText("cellid.txt", callback.CellID.ToString());
         account = steamUser.SteamID.AccountID;
 
-        Console.WriteLine("Logged in! Launching Dota 2 session...");
+        Console.WriteLine("Logged in! Checking for active game sessions...");
+        steamFriends.RequestFriendInfo(steamUser.SteamID, EClientPersonaStateFlag.GameData | EClientPersonaStateFlag.GameExtraInfo);
 
-        var playGame = new ClientMsgProtobuf<CMsgClientGamesPlayed>(EMsg.ClientGamesPlayed);
-        playGame.Body.games_played.Add(new CMsgClientGamesPlayed.GamePlayed {
-            game_id = new GameID(APPID),
+        // Explicitly await persona data up to 5 seconds
+        var completedTask = await Task.WhenAny(personaCheckTcs.Task, Task.Delay(5000));
+
+        if (completedTask == personaCheckTcs.Task && await personaCheckTcs.Task) {
+            Console.WriteLine("Active game session confirmed. Aborting sync.");
+            isRunning = false;
+            steamClient.Disconnect();
+            Environment.Exit(0);
+            return;
+        }
+
+        LaunchDotaSession();
+    }
+
+    static void OnPersonaState(SteamFriends.PersonaStateCallback callback) {
+        if (callback.FriendID == steamUser.SteamID) {
+            bool isPlaying = callback.GameID != null && callback.GameID.AppID != 0;
+            if (isPlaying) {
+                Console.WriteLine($"Active game detected: AppID {callback.GameID!.AppID} ('{callback.GameName}').");
+            }
+            personaCheckTcs.TrySetResult(isPlaying);
+        }
+    }
+
+    static void LaunchDotaSession() {
+        lock (launchLock) {
+            if (dotaSessionStarted || !isRunning) return;
+            dotaSessionStarted = true;
+        }
+
+        Task.Run(async () => {
+            Console.WriteLine("Launching Dota 2 session...");
+
+            var playGame = new ClientMsgProtobuf<CMsgClientGamesPlayed>(EMsg.ClientGamesPlayed);
+            playGame.Body.games_played.Add(new CMsgClientGamesPlayed.GamePlayed {
+                game_id = new GameID(APPID),
+            });
+            steamClient.Send(playGame);
+
+            await Task.Delay(5000);
+
+            if (!isRunning) return;
+
+            var clientHello = new ClientGCMsgProtobuf<SteamKit2.GC.Dota.Internal.CMsgClientHello>(
+                (uint)EGCBaseClientMsg.k_EMsgGCClientHello);
+            clientHello.Body.engine = ESourceEngine.k_ESE_Source2;
+            coordinator.Send(clientHello, APPID);
         });
-        steamClient.Send(playGame);
-
-        Thread.Sleep(5000);
-
-        var clientHello = new ClientGCMsgProtobuf<SteamKit2.GC.Dota.Internal.CMsgClientHello>(
-            (uint)EGCBaseClientMsg.k_EMsgGCClientHello);
-        clientHello.Body.engine = ESourceEngine.k_ESE_Source2;
-        coordinator.Send(clientHello, APPID);
     }
 
     static void OnLoggedOff(SteamUser.LoggedOffCallback callback) {
@@ -536,7 +582,6 @@ class Program {
         [JsonPropertyName("sharedSecret")]
         public string SharedSecret { get; set; } = string.Empty;
 
-        // Preserves identitySecret, githubToken, githubRepo, and any other fields untouched
         [JsonExtensionData]
         public Dictionary<string, JsonElement>? ExtraFields { get; set; }
     }
