@@ -13,7 +13,6 @@ using SteamKit2.Authentication;
 using SteamKit2.Internal;
 using SteamKit2.GC;
 using SteamKit2.GC.Dota.Internal;
-using SteamKit2.Discovery;
 using Amazon;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
@@ -47,9 +46,9 @@ class Program {
     static int matches_requested = 20;
     static int matches_remaining = 0;
     static int matches_count = -1; // -1 = fetch all new matches until latest_saved_mid
-    static uint account = 0;
     static bool isRunning = false;
     static bool haveConnected = false;
+    static bool syncSucceeded = false;
 
     static List<MatchRecord> existingMatches = new();
     static List<CMsgDOTAGetPlayerMatchHistoryResponse.Match> newlyFetchedMatches = new();
@@ -84,16 +83,7 @@ class Program {
         matches_remaining = matches_count > 0 ? matches_count : int.MaxValue;
 
         // 5. Initialize Steam client
-        var cellid = 0u;
-        if (File.Exists("cellid.txt") && uint.TryParse(File.ReadAllText("cellid.txt"), out uint parsedCellId)) {
-            cellid = parsedCellId;
-        }
-
-        var configuration = SteamConfiguration.Create(b =>
-            b.WithCellID(cellid)
-             .WithServerListProvider(new FileStorageServerListProvider("servers_list.bin")));
-
-        steamClient = new SteamClient(configuration);
+        steamClient = new SteamClient();
         manager = new CallbackManager(steamClient);
         steamUser = steamClient.GetHandler<SteamUser>()!;
         coordinator = steamClient.GetHandler<SteamGameCoordinator>()!;
@@ -116,8 +106,8 @@ class Program {
             manager.RunWaitCallbacks(TimeSpan.FromSeconds(1));
         }
 
-        if (globalCts.Token.IsCancellationRequested && isRunning) {
-            Console.Error.WriteLine("Execution timed out. Disconnecting.");
+        if (globalCts.Token.IsCancellationRequested || !syncSucceeded) {
+            Console.Error.WriteLine("Error: Sync failed to complete cleanly (timeout, unexpected disconnect, or GC communication failure).");
             steamClient.Disconnect();
             return 1;
         }
@@ -144,6 +134,13 @@ class Program {
             }
 
             var sortedList = combinedMap.Values.OrderByDescending(m => m.StartTime).ToList();
+
+            // Monotonic count check: prevent silent data truncation or accidental empty writes
+            if (sortedList.Count < existingMatches.Count) {
+                Console.Error.WriteLine($"Integrity check failed: Attempted to save {sortedList.Count} matches, but {existingMatches.Count} previously existed. Aborting write.");
+                return 1;
+            }
+
             SaveMatchesToJson(sortedList, OUTPUT_FILE);
             Console.WriteLine($"Saved {sortedList.Count} matches to {OUTPUT_FILE}");
         } else {
@@ -222,19 +219,10 @@ class Program {
         pass = Environment.GetEnvironmentVariable("STEAM_PASSWORD") ?? string.Empty;
         refreshToken = Environment.GetEnvironmentVariable("STEAM_REFRESH_TOKEN") ?? string.Empty;
         sharedSecret = Environment.GetEnvironmentVariable("STEAM_SHARED_SECRET") ?? string.Empty;
-
-        if (string.IsNullOrEmpty(refreshToken) && !string.IsNullOrEmpty(user) && File.Exists($"{user}.auth")) {
-            refreshToken = File.ReadAllText($"{user}.auth", System.Text.Encoding.ASCII).Trim();
-            Console.WriteLine($"Loaded refresh token from local {user}.auth file.");
-        }
     }
 
     static async Task PersistUpdatedTokenAsync(string newToken) {
         refreshToken = newToken;
-
-        if (!string.IsNullOrEmpty(user)) {
-            File.WriteAllText($"{user}.auth", newToken, System.Text.Encoding.ASCII);
-        }
 
         if (ssmClient != null && loadedSsmSecrets != null) {
             try {
@@ -271,16 +259,19 @@ class Program {
                     AccessToken = refreshToken,
                 });
             } else if (!string.IsNullOrEmpty(pass)) {
-                IAuthenticator auth = !string.IsNullOrEmpty(sharedSecret)
-                    ? new HeadlessTotpAuthenticator(sharedSecret)
-                    : new UserConsoleAuthenticator();
+                if (string.IsNullOrEmpty(sharedSecret)) {
+                    Console.Error.WriteLine("Error: Headless login with password requires STEAM_SHARED_SECRET for 2FA.");
+                    isRunning = false;
+                    steamClient.Disconnect();
+                    return;
+                }
 
                 var authSession = await steamClient.Authentication.BeginAuthSessionViaCredentialsAsync(
                     new AuthSessionDetails {
                         Username = user,
                         Password = pass,
                         IsPersistentSession = true,
-                        Authenticator = auth,
+                        Authenticator = new HeadlessTotpAuthenticator(sharedSecret),
                     }
                 );
 
@@ -348,9 +339,6 @@ class Program {
             steamClient.Disconnect();
             return;
         }
-
-        File.WriteAllText("cellid.txt", callback.CellID.ToString());
-        account = steamUser.SteamID!.AccountID;
 
         Console.WriteLine("Logged in! Checking for active game sessions...");
         steamFriends.RequestFriendInfo(steamUser.SteamID!, EClientPersonaStateFlag.Status | EClientPersonaStateFlag.GameExtraInfo);
@@ -452,13 +440,10 @@ class Program {
 
     static void OnMatchHistory(IPacketGCMsg packetMsg) {
         var msg = new ClientGCMsgProtobuf<CMsgDOTAGetPlayerMatchHistoryResponse>(packetMsg);
-        uint partyMMR_removal = ConvertToUnixTime(new DateTime(2019, 8, 6, 0, 0, 0, DateTimeKind.Utc));
         bool reachedExistingMatch = false;
 
         foreach (var match in msg.Body.matches) {
-            if (match.start_time != 0 && match.match_id != 0 && match.rank_change != 0 && match.previous_rank != 0 &&
-                !(match.start_time < partyMMR_removal && !match.solo_rank)) {
-
+            if (match.start_time != 0 && match.match_id != 0 && match.rank_change != 0 && match.previous_rank != 0) {
                 if (match.match_id == latest_saved_mid) {
                     reachedExistingMatch = true;
                     if (matches_count < 0) {
@@ -474,6 +459,7 @@ class Program {
 
         if (reachedExistingMatch || matches_remaining <= 0 || msg.Body.matches.Count == 0 || msg.Body.matches.Count < matches_requested) {
             Console.WriteLine("Completed match pagination.");
+            syncSucceeded = true;
             isRunning = false;
             steamClient.Disconnect();
         } else {
@@ -504,10 +490,6 @@ class Program {
         var options = new JsonSerializerOptions { WriteIndented = true };
         string json = JsonSerializer.Serialize(records, options);
         File.WriteAllText(path, json);
-    }
-
-    static uint ConvertToUnixTime(DateTime dateTime) {
-        return (uint)(dateTime.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
     }
 
     static string FormatTime(uint unixTime) {
