@@ -1,2 +1,2 @@
-My ranked match stats.
+My ranked match stats.  
 https://victualler.github.io/ranked-stats/
