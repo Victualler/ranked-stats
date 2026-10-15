@@ -31,7 +31,7 @@ class Program {
     static bool dotaSessionStarted = false;
     static readonly object launchLock = new();
     static TaskCompletionSource<bool> personaCheckTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    static CancellationTokenSource globalCts = new(TimeSpan.FromMinutes(9));
+    static CancellationTokenSource globalCts = new(TimeSpan.FromMinutes(25));
 
     static string user = string.Empty;
     static string pass = string.Empty;
@@ -117,7 +117,7 @@ class Program {
         }
 
         if (globalCts.Token.IsCancellationRequested && isRunning) {
-            Console.Error.WriteLine("Execution timed out after 9 minutes. Disconnecting.");
+            Console.Error.WriteLine("Execution timed out. Disconnecting.");
             steamClient.Disconnect();
             return 1;
         }
@@ -350,10 +350,10 @@ class Program {
         }
 
         File.WriteAllText("cellid.txt", callback.CellID.ToString());
-        account = steamUser.SteamID.AccountID;
+        account = steamUser.SteamID!.AccountID;
 
         Console.WriteLine("Logged in! Checking for active game sessions...");
-        steamFriends.RequestFriendInfo(steamUser.SteamID, EClientPersonaStateFlag.GameData | EClientPersonaStateFlag.GameExtraInfo);
+        steamFriends.RequestFriendInfo(steamUser.SteamID!, EClientPersonaStateFlag.Status | EClientPersonaStateFlag.GameExtraInfo);
 
         // Explicitly await persona data up to 5 seconds
         var completedTask = await Task.WhenAny(personaCheckTcs.Task, Task.Delay(5000));
@@ -440,7 +440,7 @@ class Program {
 
         var requestHistory = new ClientGCMsgProtobuf<CMsgDOTAGetPlayerMatchHistory>(
             (uint)EDOTAGCMsg.k_EMsgDOTAGetPlayerMatchHistory);
-        requestHistory.Body.account_id = steamUser.SteamID.AccountID;
+        requestHistory.Body.account_id = steamUser.SteamID!.AccountID;
         requestHistory.Body.matches_requested = (uint)matches_requested;
 
         if (matches_start_at_id > 0) {
