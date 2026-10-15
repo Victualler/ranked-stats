@@ -2,48 +2,51 @@ name: Daily Dota 2 MMR Sync
 
 on:
   schedule:
-    - cron: '40 0 * * *'
+    - cron: '30 2 * * *' # 02:30 UTC avoids Valve's Tuesday maintenance window (21:00-01:00 UTC)
   workflow_dispatch:
 
 permissions:
-  id-token: write   # Required for AWS OIDC
-  contents: write   # Required to commit matches.json
+  id-token: write
+  contents: write
 
 jobs:
   sync:
+    timeout-minutes: 10 # Prevents runner from hanging up to GitHub's 6-hour default
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full fetch needed for safe rebasing
 
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::619071342992:role/RankedStatsGitHubRole
           aws-region: us-west-2
+          audience: sts.amazonaws.com
 
-      - name: Setup .NET SDK
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.0.x
 
       - name: Run Tracker
+        run: dotnet run --project Tracker.csproj
         env:
-          SSM_PARAM_NAME: "/spr_steam/secrets"
-          AWS_REGION: "us-west-2"
-        run: |
-          dotnet run --project Tracker.csproj
+          SSM_PARAM_NAME: /spr_steam/secrets
 
       - name: Commit and Push Changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add matches.json
-          
+
           if ! git diff --cached --quiet; then
             git commit -m "Auto-sync Dota 2 match history [skip ci]"
-            git push
+            git pull --rebase origin main
+            git push origin main
           else
             echo "No new matches found. Skipping commit."
           fi
