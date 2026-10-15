@@ -3,76 +3,383 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dota 2 MMR Dashboard - Test</title>
+  <title>Dota 2 MMR Tracker</title>
+
+  <!-- Favicon (replace with favicon.ico or favicon.png in root) -->
+  <link rel="icon" type="image/png" href="favicon.png?v=1">
+
+  <!-- Chart.js CDN for MMR progression graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
+    :root {
+      --bg: #0f141c;
+      --card-bg: #18202c;
+      --border: #273548;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --win: #22c55e;
+      --loss: #ef4444;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
     body {
-      font-family: monospace, system-ui, sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      padding: 2rem;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 2rem 1rem;
       display: flex;
       justify-content: center;
     }
+
     .container {
       width: 100%;
-      max-width: 650px;
-      background: #1e293b;
-      padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+      max-width: 1100px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
     }
-    .status { font-weight: bold; }
-    .ok { color: #4ade80; }
-    .err { color: #f87171; }
-    pre {
-      background: #0f172a;
-      padding: 1rem;
-      border-radius: 4px;
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .last-updated {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+
+    /* Chart Container */
+    .chart-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      height: 350px;
+      position: relative;
+    }
+
+    /* Match History Table */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       overflow-x: auto;
-      max-height: 300px;
-      color: #94a3b8;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #141b24;
+      padding: 0.85rem 1rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .win {
+      color: var(--win);
+      font-weight: 600;
+    }
+
+    .loss {
+      color: var(--loss);
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-solo {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+    }
+
+    .badge-party {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+    }
+
+    .loading, .error {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Frontend Deployment Test</h2>
-    <p>GitHub Pages Status: <span class="status ok">Online</span></p>
-    <p>Data Feed Status: <span id="feedStatus" class="status">Fetching ./matches.json...</span></p>
-    <p>Total Matches: <strong id="matchCount">0</strong></p>
 
-    <h3>Raw Data Preview:</h3>
-    <pre id="output">Loading...</pre>
+  <div class="container">
+    <header>
+      <h1>Dota 2 MMR Tracker</h1>
+      <div class="last-updated" id="lastUpdated">Checking for latest matches...</div>
+    </header>
+
+    <!-- Overview Summary Cards -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Current MMR</span>
+        <span class="stat-value" id="currentMmr">--</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Peak MMR</span>
+        <span class="stat-value" id="peakMmr">--</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Win Rate</span>
+        <span class="stat-value" id="winRate">--</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Total Ranked Matches</span>
+        <span class="stat-value" id="totalMatches">--</span>
+      </div>
+    </section>
+
+    <!-- MMR Progression Chart -->
+    <section class="chart-container">
+      <canvas id="mmrChart"></canvas>
+    </section>
+
+    <!-- Recent Match History -->
+    <section class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Hero</th>
+            <th>Queue</th>
+            <th>Change</th>
+            <th>End MMR</th>
+            <th>Match ID</th>
+          </tr>
+        </thead>
+        <tbody id="matchesBody">
+          <tr>
+            <td colspan="6" class="loading">Loading match data...</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </div>
 
   <script>
-    async function testFeed() {
-      const feedStatus = document.getElementById('feedStatus');
-      const matchCount = document.getElementById('matchCount');
-      const output = document.getElementById('output');
+    let chartInstance = null;
+
+    async function loadMatches() {
+      const tbody = document.getElementById('matchesBody');
+      const lastUpdatedEl = document.getElementById('lastUpdated');
 
       try {
-        // Fetches matches.json relative to the current site root
-        const res = await fetch('./matches.json', { cache: 'no-store' });
-        
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: Could not locate matches.json`);
+        // Cache-busting query parameter + no-store header to bypass CDN and browser caching
+        const response = await fetch(`matches.json?t=${Date.now()}`, {
+          cache: 'no-store'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load matches.json (HTTP ${response.status})`);
         }
 
-        const data = await res.json();
-        
-        feedStatus.textContent = 'Connected successfully';
-        feedStatus.className = 'status ok';
-        matchCount.textContent = Array.isArray(data) ? data.length : 0;
-        output.textContent = JSON.stringify(data[0] || data, null, 2);
+        const matches = await response.json();
+
+        if (!Array.isArray(matches) || matches.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="error">No matches found in matches.json.</td></tr>';
+          lastUpdatedEl.textContent = 'No records available.';
+          return;
+        }
+
+        // matches.json is ordered newest -> oldest
+        renderStats(matches);
+        renderChart(matches);
+        renderTable(matches);
+
+        lastUpdatedEl.textContent = `Latest Match: ${matches[0].date}`;
       } catch (err) {
-        feedStatus.textContent = 'Failed to load file';
-        feedStatus.className = 'status err';
-        output.textContent = err.message;
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="6" class="error">Error loading data: ${err.message}</td></tr>`;
+        lastUpdatedEl.textContent = 'Failed to fetch latest data.';
       }
     }
 
-    testFeed();
+    function renderStats(matches) {
+      const latest = matches[0];
+      const endMmr = latest.start_mmr + latest.rank_change;
+      
+      const allEndMmrs = matches.map(m => m.start_mmr + m.rank_change);
+      const peakMmr = Math.max(...allEndMmrs);
+
+      const wins = matches.filter(m => m.rank_change > 0).length;
+      const winRate = ((wins / matches.length) * 100).toFixed(1);
+
+      document.getElementById('currentMmr').textContent = endMmr.toLocaleString();
+      document.getElementById('peakMmr').textContent = peakMmr.toLocaleString();
+      document.getElementById('winRate').textContent = `${winRate}%`;
+      document.getElementById('totalMatches').textContent = matches.length.toLocaleString();
+    }
+
+    function renderChart(matches) {
+      // Reverse to chronological order (oldest to newest) for charting
+      const chronological = [...matches].reverse();
+
+      const labels = chronological.map(m => m.date.split(' ')[0]);
+      const data = chronological.map(m => m.start_mmr + m.rank_change);
+
+      const ctx = document.getElementById('mmrChart').getContext('2d');
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'MMR Progression',
+            data: data,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.05)',
+            borderWidth: 2,
+            pointRadius: data.length > 50 ? 0 : 3,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.15
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => ` MMR: ${context.parsed.y}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#1e293b' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 10 }
+            },
+            y: {
+              grid: { color: '#1e293b' },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTable(matches) {
+      const tbody = document.getElementById('matchesBody');
+      tbody.innerHTML = '';
+
+      // Display up to the latest 100 matches in the table view
+      const displaySubset = matches.slice(0, 100);
+
+      displaySubset.forEach(match => {
+        const tr = document.createElement('tr');
+
+        const isWin = match.rank_change > 0;
+        const changeClass = isWin ? 'win' : 'loss';
+        const formattedChange = isWin ? `+${match.rank_change}` : `${match.rank_change}`;
+        const finalMmr = match.start_mmr + match.rank_change;
+
+        tr.innerHTML = `
+          <td>${match.date}</td>
+          <td><strong>${match.hero_name}</strong></td>
+          <td>
+            <span class="badge ${match.solo_queue ? 'badge-solo' : 'badge-party'}">
+              ${match.solo_queue ? 'Solo' : 'Party'}
+            </span>
+          </td>
+          <td class="${changeClass}">${formattedChange}</td>
+          <td>${finalMmr}</td>
+          <td>
+            <a href="https://www.opendota.com/matches/${match.match_id}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">
+              ${match.match_id}
+            </a>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Initial load on page entry
+    loadMatches();
   </script>
 </body>
 </html>
