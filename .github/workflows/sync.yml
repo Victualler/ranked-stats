@@ -1,8 +1,8 @@
 name: Ranked Stats Sync
 
 on:
-  schedule:
-    - cron: '30 1 * * *' # 02:30 UTC avoids Valve's Tuesday maintenance window (21:00-01:00 UTC)
+  # schedule:
+  #   - cron: '30 1 * * *' 
   workflow_dispatch:
 
 permissions:
