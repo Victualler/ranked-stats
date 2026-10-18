@@ -1,4 +1,4 @@
-name: Ranked Stats Sync
+name: stats-sync
 
 on:
   # schedule:
