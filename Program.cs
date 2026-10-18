@@ -20,6 +20,7 @@ using Amazon.SimpleSystemsManagement.Model;
 class Program {
     const int APPID = 570; // Dota 2 AppID
     const string OUTPUT_FILE = "matches.json";
+    const string PROFILE_FILE = "profile.json";
 
     static SteamClient steamClient = null!;
     static CallbackManager manager = null!;
@@ -48,12 +49,19 @@ class Program {
     static bool haveConnected = false;
     static bool syncSucceeded = false;
 
+    // Async pipeline synchronization states
+    static bool historyFetched = false;
+    static bool detailsFetched = false;
+    static bool profileFetched = false;
+    static readonly Queue<ulong> matchDetailsQueue = new();
+
     static List<MatchRecord> existingMatches = new();
-    static List<CMsgDOTAGetPlayerMatchHistoryResponse.Match> newlyFetchedMatches = new();
+    static Dictionary<ulong, MatchRecord> newMatchRecords = new();
+    static ProfileRecord? currentProfile;
     static Dictionary<int, string> heroIdToName = new();
 
     static async Task<int> Main(string[] args) {
-        Console.WriteLine("Starting Headless Dota 2 MMR Tracker...");
+        Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Stats Sync...");
 
         // 1. Fetch live hero dictionary dynamically from OpenDota constants
         await LoadHeroMapAsync();
@@ -109,21 +117,11 @@ class Program {
         }
 
         // 6. Merge, sort, and save matches
-        if (newlyFetchedMatches.Count > 0) {
-            Console.WriteLine($"Merging {newlyFetchedMatches.Count} newly fetched matches...");
-            var newRecords = newlyFetchedMatches.Select(m => new MatchRecord {
-                MatchId = m.match_id,
-                StartTime = m.start_time,
-                Date = FormatTime(m.start_time),
-                SoloQueue = m.solo_rank,
-                HeroId = m.hero_id,
-                HeroName = heroIdToName.TryGetValue(m.hero_id, out var hName) ? hName : $"Hero {m.hero_id}",
-                StartMmr = m.previous_rank,
-                RankChange = m.rank_change
-            }).ToList();
-
+        if (newMatchRecords.Count > 0) {
+            Console.WriteLine($"Merging {newMatchRecords.Count} newly fetched ranked matches...");
             var combinedMap = new Dictionary<ulong, MatchRecord>();
-            foreach (var match in newRecords.Concat(existingMatches)) {
+
+            foreach (var match in newMatchRecords.Values.Concat(existingMatches)) {
                 if (!combinedMap.ContainsKey(match.MatchId)) {
                     combinedMap[match.MatchId] = match;
                 }
@@ -141,6 +139,11 @@ class Program {
             Console.WriteLine($"Saved {sortedList.Count} matches to {OUTPUT_FILE}");
         } else {
             Console.WriteLine("No new matches found. JSON file remains up to date.");
+        }
+
+        if (currentProfile != null) {
+            SaveProfileToJson(currentProfile, PROFILE_FILE);
+            Console.WriteLine($"Saved profile stats to {PROFILE_FILE}");
         }
 
         return 0;
@@ -185,7 +188,7 @@ class Program {
         }
 
         try {
-            var regionName = Environment.GetEnvironmentVariable("AWS_REGION") ?? Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION") ?? "us-east-1";
+            var regionName = Environment.GetEnvironmentVariable("AWS_REGION") ?? Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION") ?? "us-west-2";
             var region = RegionEndpoint.GetBySystemName(regionName);
             ssmClient = new AmazonSimpleSystemsManagementClient(region);
 
@@ -359,6 +362,7 @@ class Program {
 
             if (!isRunning) return;
 
+            // Fully qualify type to avoid ambiguity with SteamKit2.Internal.CMsgClientHello
             var clientHello = new ClientGCMsgProtobuf<SteamKit2.GC.Dota.Internal.CMsgClientHello>(
                 (uint)EGCBaseClientMsg.k_EMsgGCClientHello);
             clientHello.Body.engine = ESourceEngine.k_ESE_Source2;
@@ -369,7 +373,6 @@ class Program {
     static void OnLoggedOff(SteamUser.LoggedOffCallback callback) {
         Console.WriteLine($"Logged off of Steam: {callback.Result}");
 
-        // If kicked because your desktop client is running, skip cleanly with code 0
         if (callback.Result == EResult.LoggedInElsewhere ||
             callback.Result == EResult.LogonSessionReplaced ||
             callback.Result == EResult.AlreadyLoggedInElsewhere) {
@@ -388,6 +391,8 @@ class Program {
         var messageMap = new Dictionary<uint, Action<IPacketGCMsg>> {
             { (uint)EGCBaseClientMsg.k_EMsgGCClientWelcome, OnClientWelcome },
             { (uint)EDOTAGCMsg.k_EMsgDOTAGetPlayerMatchHistoryResponse, OnMatchHistory },
+            { (uint)EDOTAGCMsg.k_EMsgGCMatchDetailsResponse, OnMatchDetails },
+            { (uint)EDOTAGCMsg.k_EMsgClientToGCGetProfileCardResponse, OnProfileCard },
         };
 
         if (messageMap.TryGetValue(callback.EMsg, out var func)) {
@@ -395,16 +400,57 @@ class Program {
         }
     }
 
+    // -----------------------------------------------------------------------------------------
+    // GC Request / Response Handlers
+    // -----------------------------------------------------------------------------------------
+
     static void OnClientWelcome(IPacketGCMsg packetMsg) {
         var msg = new ClientGCMsgProtobuf<CMsgClientWelcome>(packetMsg);
         Console.WriteLine($"GC connected. Version: {msg.Body.version}");
 
+        // 1. Trigger Profile Card fetch
+        Console.WriteLine("Requesting account profile card...");
+        var profileReq = new ClientGCMsgProtobuf<CMsgClientToGCGetProfileCard>(
+            (uint)EDOTAGCMsg.k_EMsgClientToGCGetProfileCard);
+        profileReq.Body.account_id = steamUser.SteamID!.AccountID;
+        coordinator.Send(profileReq, APPID);
+
+        // 2. Trigger Match History pagination
         if (matches_count > 0)
             Console.WriteLine($"Requesting up to {matches_count} matches...");
         else
             Console.WriteLine("Requesting matches until last stored match ID is reached...");
 
         FetchMatches();
+    }
+
+    static void OnProfileCard(IPacketGCMsg packetMsg) {
+        // SteamKit2 names the profile card response CMsgDOTAProfileCard
+        var msg = new ClientGCMsgProtobuf<CMsgDOTAProfileCard>(packetMsg);
+        Console.WriteLine($"Received Profile Card. Rank Tier: {msg.Body.rank_tier}, Leaderboard: {msg.Body.leaderboard_rank}");
+
+        currentProfile = new ProfileRecord {
+            AccountId = msg.Body.account_id,
+            LastUpdatedUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"),
+            RankTier = msg.Body.rank_tier,
+            RankName = GetRankTierName(msg.Body.rank_tier),
+            LeaderboardRank = msg.Body.leaderboard_rank,
+            BadgePoints = msg.Body.badge_points,
+            LifetimeGames = msg.Body.lifetime_games,
+            LifetimeWins = msg.Body.lifetime_wins,
+            WinRatePercent = msg.Body.lifetime_games > 0 
+                ? Math.Round((double)msg.Body.lifetime_wins / msg.Body.lifetime_games * 100, 2) 
+                : 0,
+            ShowcaseSlots = msg.Body.slots?.Select(s => new ProfileSlot {
+                SlotId = s.slot_id,
+                StatId = s.stat_id,
+                StatScore = s.stat_score,
+                HeroId = s.hero_id
+            }).ToList() ?? new List<ProfileSlot>()
+        };
+
+        profileFetched = true;
+        CheckSyncCompletion();
     }
 
     static void FetchMatches() {
@@ -428,29 +474,144 @@ class Program {
         bool reachedExistingMatch = false;
 
         foreach (var match in msg.Body.matches) {
-            if (match.start_time != 0 && match.match_id != 0 && match.rank_change != 0 && match.previous_rank != 0) {
-                if (match.match_id == latest_saved_mid) {
-                    reachedExistingMatch = true;
-                    if (matches_count < 0) {
-                        matches_remaining = 0;
-                    }
-                    break;
+            // Stop condition: reach the most recently recorded match ID
+            if (match.match_id == latest_saved_mid) {
+                reachedExistingMatch = true;
+                if (matches_count < 0) {
+                    matches_remaining = 0;
                 }
-
-                newlyFetchedMatches.Add(match);
+                break;
             }
+
+            // Identify ranked matches (captures standard ranked and calibration)
+            bool isRanked = match.lobby_type == 7 || match.previous_rank != 0 || match.rank_change != 0;
+
+            if (isRanked && match.start_time != 0 && match.match_id != 0) {
+                bool isCalib = match.previous_rank == 0 && match.rank_change == 0;
+                uint? calculatedEndMmr = (!isCalib && match.previous_rank > 0)
+                    ? (uint)Math.Max(0, (int)match.previous_rank + match.rank_change)
+                    : null;
+
+                var record = new MatchRecord {
+                    MatchId = match.match_id,
+                    StartTime = match.start_time,
+                    Date = FormatTime(match.start_time),
+                    SoloQueue = match.solo_rank,
+                    HeroId = match.hero_id,
+                    HeroName = heroIdToName.TryGetValue(match.hero_id, out var hName) ? hName : $"Hero {match.hero_id}",
+                    StartMmr = match.previous_rank,
+                    RankChange = match.rank_change,
+                    EndMmr = calculatedEndMmr,
+                    IsCalibration = isCalib,
+                    LobbyType = (int)match.lobby_type,
+                    GameMode = (int)match.game_mode
+                };
+
+                if (!newMatchRecords.ContainsKey(match.match_id)) {
+                    newMatchRecords[match.match_id] = record;
+                }
+            }
+
             matches_start_at_id = match.match_id;
         }
 
         if (reachedExistingMatch || matches_remaining <= 0 || msg.Body.matches.Count == 0 || msg.Body.matches.Count < matches_requested) {
-            Console.WriteLine("Completed match pagination.");
-            syncSucceeded = true;
-            isRunning = false;
-            steamClient.Disconnect();
+            Console.WriteLine($"Match history pagination complete. Found {newMatchRecords.Count} new ranked matches.");
+            historyFetched = true;
+
+            // Enqueue all newly discovered matches for Deep Match Details inspection
+            foreach (var mid in newMatchRecords.Keys) {
+                matchDetailsQueue.Enqueue(mid);
+            }
+
+            if (matchDetailsQueue.Count > 0) {
+                Console.WriteLine($"Enqueuing {matchDetailsQueue.Count} matches for deep scoreboard details...");
+                FetchNextMatchDetail();
+            } else {
+                detailsFetched = true;
+                CheckSyncCompletion();
+            }
         } else {
             Thread.Sleep(1000); // Respect GC 1 req/sec rate limit
             Console.WriteLine($"Fetched page. Next start_at_match_id: {matches_start_at_id}");
             FetchMatches();
+        }
+    }
+
+    static void FetchNextMatchDetail() {
+        if (matchDetailsQueue.Count == 0) {
+            Console.WriteLine("Finished fetching all deep match details.");
+            detailsFetched = true;
+            CheckSyncCompletion();
+            return;
+        }
+
+        ulong matchId = matchDetailsQueue.Dequeue();
+        Console.WriteLine($"Requesting deep details for match {matchId} ({matchDetailsQueue.Count} remaining)...");
+
+        var req = new ClientGCMsgProtobuf<CMsgGCMatchDetailsRequest>(
+            (uint)EDOTAGCMsg.k_EMsgGCMatchDetailsRequest);
+        req.Body.match_id = matchId;
+        coordinator.Send(req, APPID);
+    }
+
+    static void OnMatchDetails(IPacketGCMsg packetMsg) {
+        var msg = new ClientGCMsgProtobuf<CMsgGCMatchDetailsResponse>(packetMsg);
+
+        if (msg.Body.match != null) {
+            var m = msg.Body.match;
+            if (newMatchRecords.TryGetValue(m.match_id, out var record)) {
+                record.DurationSeconds = m.duration;
+                record.FirstBloodTime = m.first_blood_time;
+
+                uint myAccountId = steamUser.SteamID!.AccountID;
+                var player = m.players.FirstOrDefault(p => p.account_id == myAccountId);
+
+                if (player != null) {
+                    bool isRadiant = player.player_slot < 128;
+                    record.Team = isRadiant ? "radiant" : "dire";
+                    record.Win = isRadiant ? m.radiant_win : !m.radiant_win;
+                    record.PlayerSlot = player.player_slot;
+                    record.Level = player.level;
+                    record.Kills = player.kills;
+                    record.Deaths = player.deaths;
+                    record.Assists = player.assists;
+                    record.LastHits = player.last_hits;
+                    record.Denies = player.denies;
+                    record.Gpm = player.gold_per_min;
+                    record.Xpm = player.xp_per_min;
+                    record.NetWorth = player.net_worth;
+                    record.HeroDamage = player.hero_damage;
+                    record.TowerDamage = player.tower_damage;
+                    record.HeroHealing = player.hero_healing;
+                    record.LeaverStatus = (int)player.leaver_status;
+
+                    if (player.deaths > 0) {
+                        record.Kda = Math.Round((double)(player.kills + player.assists) / player.deaths, 2);
+                    } else {
+                        record.Kda = Math.Round((double)(player.kills + player.assists), 2);
+                    }
+
+                    // Main 6 inventory item slots
+                    record.Items = new List<int> {
+                        (int)player.item_0, (int)player.item_1, (int)player.item_2,
+                        (int)player.item_3, (int)player.item_4, (int)player.item_5
+                    };
+                }
+            }
+        }
+
+        // Respect GC 1 req/sec rate limit before triggering the next queued match detail
+        Thread.Sleep(1000);
+        FetchNextMatchDetail();
+    }
+
+    static void CheckSyncCompletion() {
+        if (profileFetched && historyFetched && detailsFetched) {
+            Console.WriteLine("All data synchronization steps completed successfully.");
+            syncSucceeded = true;
+            isRunning = false;
+            steamClient.Disconnect();
         }
     }
 
@@ -472,13 +633,40 @@ class Program {
     }
 
     static void SaveMatchesToJson(List<MatchRecord> records, string path) {
-        var options = new JsonSerializerOptions { WriteIndented = true };
+        var options = new JsonSerializerOptions { 
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+        };
         string json = JsonSerializer.Serialize(records, options);
+        File.WriteAllText(path, json);
+    }
+
+    static void SaveProfileToJson(ProfileRecord profile, string path) {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string json = JsonSerializer.Serialize(profile, options);
         File.WriteAllText(path, json);
     }
 
     static string FormatTime(uint unixTime) {
         return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).ToLocalTime().AddSeconds(unixTime).ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    static string GetRankTierName(uint tier) {
+        if (tier == 0) return "Uncalibrated";
+        uint medal = tier / 10;
+        uint stars = tier % 10;
+        string medalName = medal switch {
+            1 => "Herald",
+            2 => "Guardian",
+            3 => "Crusader",
+            4 => "Archon",
+            5 => "Legend",
+            6 => "Ancient",
+            7 => "Divine",
+            8 => "Immortal",
+            _ => "Unknown"
+        };
+        return medal == 8 ? "Immortal" : $"{medalName} {stars}";
     }
 
     // -----------------------------------------------------------------------------------------
@@ -553,29 +741,151 @@ class Program {
         public Dictionary<string, JsonElement>? ExtraFields { get; set; }
     }
 
+    public class ProfileRecord {
+        [JsonPropertyName("account_id")]
+        public uint AccountId { get; set; }
+
+        [JsonPropertyName("last_updated_utc")]
+        public string LastUpdatedUtc { get; set; } = string.Empty;
+
+        [JsonPropertyName("rank_tier")]
+        public uint RankTier { get; set; }
+
+        [JsonPropertyName("rank_name")]
+        public string RankName { get; set; } = string.Empty;
+
+        [JsonPropertyName("leaderboard_rank")]
+        public uint LeaderboardRank { get; set; }
+
+        [JsonPropertyName("badge_points")]
+        public uint BadgePoints { get; set; }
+
+        [JsonPropertyName("lifetime_games")]
+        public uint LifetimeGames { get; set; }
+
+        [JsonPropertyName("lifetime_wins")]
+        public uint LifetimeWins { get; set; }
+
+        [JsonPropertyName("win_rate_percent")]
+        public double WinRatePercent { get; set; }
+
+        [JsonPropertyName("showcase_slots")]
+        public List<ProfileSlot> ShowcaseSlots { get; set; } = new();
+    }
+
+    public class ProfileSlot {
+        [JsonPropertyName("slot_id")]
+        public uint SlotId { get; set; }
+
+        [JsonPropertyName("stat_id")]
+        public uint StatId { get; set; }
+
+        [JsonPropertyName("stat_score")]
+        public uint StatScore { get; set; }
+
+        [JsonPropertyName("hero_id")]
+        public uint HeroId { get; set; }
+    }
+
     public class MatchRecord {
+        // Core History Identifiers
+        [JsonPropertyName("match_id")]
+        public ulong MatchId { get; set; }
+
         [JsonPropertyName("date")]
         public string Date { get; set; } = string.Empty;
 
         [JsonPropertyName("unix_time")]
         public uint StartTime { get; set; }
 
-        [JsonPropertyName("match_id")]
-        public ulong MatchId { get; set; }
-
         [JsonPropertyName("solo_queue")]
         public bool SoloQueue { get; set; }
 
+        [JsonPropertyName("lobby_type")]
+        public int LobbyType { get; set; }
+
+        [JsonPropertyName("game_mode")]
+        public int GameMode { get; set; }
+
+        [JsonPropertyName("is_calibration")]
+        public bool IsCalibration { get; set; }
+
+        // MMR Metrics
+        [JsonPropertyName("start_mmr")]
+        public uint StartMmr { get; set; }
+
+        [JsonPropertyName("rank_change")]
+        public int RankChange { get; set; }
+
+        [JsonPropertyName("end_mmr")]
+        public uint? EndMmr { get; set; }
+
+        // Hero Details
         [JsonPropertyName("hero_id")]
         public int HeroId { get; set; }
 
         [JsonPropertyName("hero_name")]
         public string HeroName { get; set; } = string.Empty;
 
-        [JsonPropertyName("start_mmr")]
-        public uint StartMmr { get; set; }
+        // Deep Match Scoreboard (Populated from CMsgGCMatchDetailsResponse)
+        [JsonPropertyName("duration_seconds")]
+        public uint? DurationSeconds { get; set; }
 
-        [JsonPropertyName("rank_change")]
-        public int RankChange { get; set; }
+        [JsonPropertyName("first_blood_time")]
+        public uint? FirstBloodTime { get; set; }
+
+        [JsonPropertyName("win")]
+        public bool? Win { get; set; }
+
+        [JsonPropertyName("team")]
+        public string? Team { get; set; }
+
+        [JsonPropertyName("player_slot")]
+        public uint? PlayerSlot { get; set; }
+
+        [JsonPropertyName("level")]
+        public uint? Level { get; set; }
+
+        [JsonPropertyName("kills")]
+        public uint? Kills { get; set; }
+
+        [JsonPropertyName("deaths")]
+        public uint? Deaths { get; set; }
+
+        [JsonPropertyName("assists")]
+        public uint? Assists { get; set; }
+
+        [JsonPropertyName("kda")]
+        public double? Kda { get; set; }
+
+        [JsonPropertyName("last_hits")]
+        public uint? LastHits { get; set; }
+
+        [JsonPropertyName("denies")]
+        public uint? Denies { get; set; }
+
+        [JsonPropertyName("net_worth")]
+        public uint? NetWorth { get; set; }
+
+        [JsonPropertyName("gpm")]
+        public uint? Gpm { get; set; }
+
+        [JsonPropertyName("xpm")]
+        public uint? Xpm { get; set; }
+
+        [JsonPropertyName("hero_damage")]
+        public uint? HeroDamage { get; set; }
+
+        [JsonPropertyName("tower_damage")]
+        public uint? TowerDamage { get; set; }
+
+        [JsonPropertyName("hero_healing")]
+        public uint? HeroHealing { get; set; }
+
+        [JsonPropertyName("leaver_status")]
+        public int? LeaverStatus { get; set; }
+
+        [JsonPropertyName("items")]
+        public List<int>? Items { get; set; }
     }
 }
