@@ -655,9 +655,9 @@ class Program {
                     };
                     record.NeutralItem = player.item_9;
 
-                    // Builds & Consumed Buffs
-                    record.AbilityUpgrades = player.ability_upgrades?.ToList();
-                    record.PermanentBuffs = ExtractPermanentBuffs(player.permanent_buffs);
+                    // Builds & Consumed Buffs via reflection helper
+                    record.AbilityUpgrades = ExtractObjectList(player.ability_upgrades);
+                    record.PermanentBuffs = ExtractObjectList(player.permanent_buffs);
                 }
             }
         }
@@ -707,7 +707,6 @@ class Program {
 
         try {
             string json = File.ReadAllText(path);
-            // Accommodate previous single-object schema if present
             if (json.TrimStart().StartsWith("{")) {
                 var single = JsonSerializer.Deserialize<ProfileBadgeMilestone>(json);
                 return single != null ? new List<ProfileBadgeMilestone> { single } : new List<ProfileBadgeMilestone>();
@@ -729,15 +728,21 @@ class Program {
         File.WriteAllText(path, json);
     }
 
-    static List<Dictionary<string, object?>>? ExtractPermanentBuffs(IEnumerable? buffs) {
-        if (buffs == null) return null;
+    static List<Dictionary<string, object?>>? ExtractObjectList(IEnumerable? items) {
+        if (items == null) return null;
 
         var list = new List<Dictionary<string, object?>>();
-        foreach (var b in buffs) {
-            if (b == null) continue;
+        foreach (var item in items) {
+            if (item == null) continue;
             var entry = new Dictionary<string, object?>();
-            foreach (var prop in b.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
-                entry[prop.Name] = prop.GetValue(b);
+            foreach (var prop in item.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                if (prop.Name == "ExtensionObject") continue;
+                try {
+                    var val = prop.GetValue(item);
+                    if (val != null) {
+                        entry[prop.Name] = val;
+                    }
+                } catch { }
             }
             if (entry.Count > 0) list.Add(entry);
         }
@@ -1095,7 +1100,7 @@ class Program {
         public int? NeutralItem { get; set; }
 
         [JsonPropertyName("ability_upgrades")]
-        public List<uint>? AbilityUpgrades { get; set; }
+        public List<Dictionary<string, object?>>? AbilityUpgrades { get; set; }
 
         [JsonPropertyName("permanent_buffs")]
         public List<Dictionary<string, object?>>? PermanentBuffs { get; set; }
