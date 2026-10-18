@@ -658,6 +658,7 @@ class Program {
                     // Builds & Consumed Buffs via reflection helper
                     record.AbilityUpgrades = ExtractObjectList(player.ability_upgrades);
                     record.PermanentBuffs = ExtractObjectList(player.permanent_buffs);
+                    record.AdditionalUnitsInventory = ExtractObjectList(player.additional_units_inventory);
                 }
             }
         }
@@ -1104,5 +1105,8 @@ class Program {
 
         [JsonPropertyName("permanent_buffs")]
         public List<Dictionary<string, object?>>? PermanentBuffs { get; set; }
+
+        [JsonPropertyName("additional_units_inventory")]
+        public List<Dictionary<string, object?>>? AdditionalUnitsInventory { get; set; }
     }
 }
