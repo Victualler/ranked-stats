@@ -1,8 +1,6 @@
 name: stats-sync
 
 on:
-  # schedule:
-  #   - cron: '30 1 * * *' 
   workflow_dispatch:
 
 permissions:
@@ -11,21 +9,20 @@ permissions:
 
 jobs:
   sync:
-    timeout-minutes: 30 # Prevents runner from hanging up to GitHub's 6-hour default
+    timeout-minutes: 30
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full fetch needed for safe rebasing
+          fetch-depth: 0
 
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::619071342992:role/RankedStatsGitHubRole
           aws-region: us-west-2
-          audience: sts.amazonaws.com
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
@@ -34,8 +31,6 @@ jobs:
 
       - name: Run Tracker
         run: dotnet run --project Tracker.csproj
-        env:
-          SSM_PARAM_NAME: /spr_steam/secrets
 
       - name: Commit and Push Changes
         run: |
@@ -44,7 +39,7 @@ jobs:
           git add matches.json profile.json
 
           if ! git diff --cached --quiet; then
-            git commit -m "Auto-sync Dota 2 match history [skip ci]"
+            git commit -m "Auto-sync Dota 2 match history"
             git pull --rebase origin main
             git push origin main
           else
