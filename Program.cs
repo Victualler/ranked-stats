@@ -645,6 +645,10 @@ class Program {
                     record.LeaverStatus = (int)player.leaver_status;
                     record.PartyId = player.party_id;
 
+                    // Combat Breakdown Lists
+                    record.HeroDamageDealt = ExtractObjectList(player.hero_damage_dealt);
+                    record.HeroDamageReceived = ExtractObjectList(player.hero_damage_received);
+
                     // Items: Primary (0-5), Backpack (6-8), Neutral (9)
                     record.Items = new List<int> {
                         player.item_0, player.item_1, player.item_2,
@@ -1089,6 +1093,12 @@ class Program {
 
         [JsonPropertyName("lane_selection_flags")]
         public uint? LaneSelectionFlags { get; set; }
+        
+        [JsonPropertyName("hero_damage_dealt")]
+        public List<Dictionary<string, object?>>? HeroDamageDealt { get; set; }
+        
+        [JsonPropertyName("hero_damage_received")]
+        public List<Dictionary<string, object?>>? HeroDamageReceived { get; set; }
 
         // --- Items, Builds, and Buffs ---
         [JsonPropertyName("items")]
