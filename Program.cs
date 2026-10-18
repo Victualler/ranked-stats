@@ -595,8 +595,12 @@ class Program {
 
                 if (player != null) {
                     bool isRadiant = player.player_slot < 128;
+                    bool teamWon = isRadiant ? isRadiantWin : !isRadiantWin;
+                    // leaver_status > 1 represents disconnect too long, manual abandon, or AFK abandon
+                    bool didAbandon = player.leaver_status > 1;
+                    
                     record.Team = isRadiant ? "radiant" : "dire";
-                    record.Win = isRadiant ? isRadiantWin : !isRadiantWin;
+                    record.Win = teamWon && !didAbandon;
                     record.PlayerSlot = player.player_slot;
                     record.TeamNumber = (int)player.team_number;
                     record.TeamSlot = player.team_slot;
