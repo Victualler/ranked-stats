@@ -19,9 +19,9 @@ using Amazon.SimpleSystemsManagement.Model;
 
 class Program {
     const int APPID = 570; // Dota 2 AppID
-    const string OUTPUT_FILE = "matches.json";
-    const string PROFILE_FILE = "profile.json";
-    const string HEROES_FILE = "heroes.json";
+    const string OUTPUT_FILE = "data/matches.json";
+    const string PROFILE_FILE = "data/profile.json";
+    const string HEROES_FILE = "constants/heroes.json";
 
     static SteamClient steamClient = null!;
     static CallbackManager manager = null!;
@@ -62,6 +62,9 @@ class Program {
 
     static async Task<int> Main(string[] args) {
         Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Minimal Stats Sync...");
+
+        Directory.CreateDirectory("constants");
+        Directory.CreateDirectory("data");
 
         // 1. Initialize local hero mapping with on-demand fallback
         EnsureHeroMapLoaded();
