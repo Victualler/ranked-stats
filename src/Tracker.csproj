@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <!-- Suppress platform warnings from the original Windows-targeted DLL -->
     <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <!-- Ensures paths like data/ and constants/ resolve to the repo root -->
+    <RunWorkingDirectory>..</RunWorkingDirectory>
   </PropertyGroup>
 
   <!-- Dependencies -->
