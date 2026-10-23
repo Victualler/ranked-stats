@@ -1,5 +1,256 @@
 [
   {
+    "match_id": 9056833212,
+    "match_seq_num": 0,
+    "date": "2026-10-22 16:24:00",
+    "unix_time": 1792686240,
+    "solo_queue": true,
+    "lobby_type": 7,
+    "game_mode": 22,
+    "is_calibration": true,
+    "start_mmr": 0,
+    "rank_change": 0,
+    "hero_id": 103,
+    "hero_name": "Elder Titan",
+    "selected_facet": 0,
+    "duration_seconds": 2632,
+    "pre_game_duration": 90,
+    "first_blood_time": 68,
+    "cluster": 271,
+    "replay_salt": 824243476,
+    "human_players": 10,
+    "average_skill": 0,
+    "game_balance": 0,
+    "radiant_team_score": 46,
+    "dire_team_score": 37,
+    "tower_status": [
+      1830,
+      6
+    ],
+    "barracks_status": [
+      63,
+      63
+    ],
+    "match_outcome": "k_EMatchOutcome_RadVictory",
+    "win": true,
+    "team": "radiant",
+    "team_number": 0,
+    "team_slot": 0,
+    "player_slot": 0,
+    "party_id": 0,
+    "level": 22,
+    "leaver_status": 0,
+    "kills": 1,
+    "deaths": 5,
+    "assists": 28,
+    "kda": 5.8,
+    "scaled_kills": 0,
+    "scaled_deaths": 0,
+    "scaled_assists": 0,
+    "last_hits": 40,
+    "denies": 1,
+    "claimed_farm_gold": 0,
+    "support_gold": 0,
+    "claimed_denies": 0,
+    "claimed_misses": 0,
+    "misses": 0,
+    "net_worth": 12295,
+    "gold": 1295,
+    "gold_spent": 12615,
+    "gold_lost_to_death": 360,
+    "gpm": 334,
+    "xpm": 633,
+    "hero_damage": 12327,
+    "scaled_hero_damage": 7999,
+    "tower_damage": 1084,
+    "scaled_tower_damage": 334,
+    "hero_healing": 0,
+    "scaled_hero_healing": 0,
+    "support_ability_value": 0,
+    "feeding_detected": false,
+    "seconds_dead": 122,
+    "bounty_runes": 5,
+    "outposts_captured": 1,
+    "lane_selection_flags": 16,
+    "hero_damage_dealt": [
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 0
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 1
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 2
+      }
+    ],
+    "hero_damage_received": [
+      {
+        "pre_reduction": 20816,
+        "post_reduction": 10016,
+        "damage_type": 0
+      },
+      {
+        "pre_reduction": 9563,
+        "post_reduction": 6288,
+        "damage_type": 1
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 2
+      }
+    ],
+    "items": [
+      214,
+      108,
+      100,
+      185,
+      244,
+      0
+    ],
+    "backpack": [
+      188,
+      0,
+      0
+    ],
+    "neutral_item": 1719,
+    "permanent_buffs": [
+      {
+        "permanent_buff": 12,
+        "stack_count": 0,
+        "grant_time": 2823
+      }
+    ]
+  },
+  {
+    "match_id": 9056728264,
+    "match_seq_num": 0,
+    "date": "2026-10-22 15:18:12",
+    "unix_time": 1792682292,
+    "solo_queue": true,
+    "lobby_type": 7,
+    "game_mode": 22,
+    "is_calibration": true,
+    "start_mmr": 0,
+    "rank_change": 0,
+    "hero_id": 103,
+    "hero_name": "Elder Titan",
+    "selected_facet": 0,
+    "duration_seconds": 1909,
+    "pre_game_duration": 90,
+    "first_blood_time": 5,
+    "cluster": 273,
+    "replay_salt": 1235367145,
+    "human_players": 10,
+    "average_skill": 0,
+    "game_balance": 0,
+    "radiant_team_score": 7,
+    "dire_team_score": 43,
+    "tower_status": [
+      0,
+      1974
+    ],
+    "barracks_status": [
+      0,
+      0
+    ],
+    "match_outcome": "k_EMatchOutcome_DireVictory",
+    "win": true,
+    "team": "dire",
+    "team_number": 1,
+    "team_slot": 3,
+    "player_slot": 131,
+    "party_id": 8,
+    "level": 18,
+    "leaver_status": 0,
+    "kills": 0,
+    "deaths": 0,
+    "assists": 28,
+    "kda": 28,
+    "scaled_kills": 0,
+    "scaled_deaths": 0,
+    "scaled_assists": 0,
+    "last_hits": 31,
+    "denies": 1,
+    "claimed_farm_gold": 0,
+    "support_gold": 0,
+    "claimed_denies": 0,
+    "claimed_misses": 0,
+    "misses": 0,
+    "net_worth": 10088,
+    "gold": 288,
+    "gold_spent": 12095,
+    "gold_lost_to_death": 0,
+    "gpm": 336,
+    "xpm": 604,
+    "hero_damage": 8842,
+    "scaled_hero_damage": 7019,
+    "tower_damage": 863,
+    "scaled_tower_damage": 487,
+    "hero_healing": 0,
+    "scaled_hero_healing": 0,
+    "support_ability_value": 0,
+    "feeding_detected": false,
+    "seconds_dead": 0,
+    "bounty_runes": 3,
+    "outposts_captured": 0,
+    "lane_selection_flags": 16,
+    "hero_damage_dealt": [
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 0
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 1
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 2
+      }
+    ],
+    "hero_damage_received": [
+      {
+        "pre_reduction": 3308,
+        "post_reduction": 2167,
+        "damage_type": 0
+      },
+      {
+        "pre_reduction": 4853,
+        "post_reduction": 3453,
+        "damage_type": 1
+      },
+      {
+        "pre_reduction": 0,
+        "post_reduction": 0,
+        "damage_type": 2
+      }
+    ],
+    "items": [
+      244,
+      214,
+      226,
+      185,
+      42,
+      0
+    ],
+    "backpack": [
+      0,
+      188,
+      0
+    ],
+    "neutral_item": 574
+  },
+  {
     "match_id": 9055434948,
     "match_seq_num": 0,
     "date": "2026-10-21 16:06:25",
