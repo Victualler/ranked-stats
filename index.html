@@ -227,17 +227,15 @@
     <section class="table-container">
       <table>
         <thead>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Hero</th>
-              <th>Side</th>
-              <th>Result</th>
-              <th>Change</th>
-              <th>End MMR</th>
-              <th>Match ID</th>
-            </tr>
-          </thead>
+          <tr>
+            <th>Date</th>
+            <th>Hero</th>
+            <th>Side</th>
+            <th>Result</th>
+            <th>Change</th>
+            <th>End MMR</th>
+            <th>Match ID</th>
+          </tr>
         </thead>
         <tbody id="matchesBody">
           <tr>
@@ -248,8 +246,24 @@
     </section>
   </div>
 
-<script>
+  <script>
     let chartInstance = null;
+
+    // Helper: Safely resolve end MMR across new schema, calibration, and legacy records
+    function getEndMmr(m) {
+      if (typeof m.end_mmr === 'number') return m.end_mmr;
+      if (m.is_calibration) return null;
+      if (typeof m.start_mmr === 'number' && m.start_mmr > 0) {
+        return m.start_mmr + (m.rank_change || 0);
+      }
+      return null;
+    }
+
+    // Helper: Safely resolve win/loss status across new and legacy records
+    function getWinStatus(m) {
+      if (typeof m.win === 'boolean') return m.win;
+      return (m.rank_change || 0) > 0;
+    }
 
     async function loadMatches() {
       const tbody = document.getElementById('matchesBody');
@@ -286,15 +300,15 @@
 
     function renderStats(matches) {
       const latest = matches[0];
-      const currentMmr = latest.end_mmr !== null ? latest.end_mmr.toLocaleString() : 'Calibrating';
+      const latestMmr = getEndMmr(latest);
+      const currentMmr = latestMmr !== null ? latestMmr.toLocaleString() : 'Calibrating';
 
-      // Peak MMR considers any matches with recorded numerical MMR
       const validMmrs = matches
-        .map(m => m.end_mmr)
+        .map(m => getEndMmr(m))
         .filter(v => typeof v === 'number');
       const peakMmr = validMmrs.length > 0 ? Math.max(...validMmrs).toLocaleString() : '--';
 
-      const wins = matches.filter(m => m.win === true).length;
+      const wins = matches.filter(m => getWinStatus(m)).length;
       const winRate = ((wins / matches.length) * 100).toFixed(1);
 
       document.getElementById('currentMmr').textContent = currentMmr;
@@ -304,11 +318,10 @@
     }
 
     function renderChart(matches) {
-      // Retain all matches including calibration games in chronological order
       const chronological = [...matches].reverse();
 
       const labels = chronological.map(m => m.date.split(' ')[0]);
-      const data = chronological.map(m => m.end_mmr);
+      const data = chronological.map(m => getEndMmr(m));
 
       const ctx = document.getElementById('mmrChart').getContext('2d');
 
@@ -330,7 +343,7 @@
             pointHoverRadius: 5,
             fill: true,
             tension: 0.15,
-            spanGaps: true // Connects the trendline across calibration matches (null points)
+            spanGaps: true
           }]
         },
         options: {
@@ -370,17 +383,18 @@
       displaySubset.forEach(match => {
         const tr = document.createElement('tr');
 
-        const isWin = match.win;
+        const isWin = getWinStatus(match);
         const outcomeClass = isWin ? 'win' : 'loss';
         const outcomeText = isWin ? 'Won' : 'Lost';
 
         let formattedChange = '—';
-        if (match.rank_change !== 0) {
+        if (typeof match.rank_change === 'number' && match.rank_change !== 0) {
           formattedChange = match.rank_change > 0 ? `+${match.rank_change}` : `${match.rank_change}`;
         }
 
-        const finalMmr = match.end_mmr !== null ? match.end_mmr.toLocaleString() : 'Calibrating';
-        const teamClass = match.team === 'radiant' ? 'badge-radiant' : 'badge-dire';
+        const endMmr = getEndMmr(match);
+        const finalMmr = endMmr !== null ? endMmr.toLocaleString() : 'Calibrating';
+        const teamClass = match.team === 'radiant' ? 'badge-radiant' : (match.team === 'dire' ? 'badge-dire' : '');
 
         tr.innerHTML = `
           <td>${match.date}</td>
