@@ -1,10 +1,8 @@
 using System;
 using System.IO;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
@@ -23,6 +21,7 @@ class Program {
     const int APPID = 570; // Dota 2 AppID
     const string OUTPUT_FILE = "matches.json";
     const string PROFILE_FILE = "profile.json";
+    const string HEROES_FILE = "heroes.json";
 
     static SteamClient steamClient = null!;
     static CallbackManager manager = null!;
@@ -62,10 +61,10 @@ class Program {
     static Dictionary<int, string> heroIdToName = new();
 
     static async Task<int> Main(string[] args) {
-        Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Deep Stats Sync...");
+        Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Minimal Stats Sync...");
 
-        // 1. Fetch live hero dictionary dynamically from OpenDota constants
-        await LoadHeroMapAsync();
+        // 1. Initialize local hero mapping with on-demand fallback
+        EnsureHeroMapLoaded();
 
         // 2. Resolve secrets from AWS SSM Parameter Store or Environment Variables
         await LoadCredentialsAsync();
@@ -146,30 +145,61 @@ class Program {
     }
 
     // -----------------------------------------------------------------------------------------
-    // Dynamic Hero Constants
+    // Offline-First Hero Mapping
     // -----------------------------------------------------------------------------------------
 
-    static async Task LoadHeroMapAsync() {
+    static void EnsureHeroMapLoaded() {
+        if (File.Exists(HEROES_FILE)) {
+            try {
+                string json = File.ReadAllText(HEROES_FILE);
+                ParseHeroMapJson(json);
+                Console.WriteLine($"Loaded {heroIdToName.Count} heroes from local {HEROES_FILE}.");
+            } catch (Exception ex) {
+                Console.WriteLine($"Warning: Failed to parse local {HEROES_FILE}: {ex.Message}");
+            }
+        }
+
+        if (heroIdToName.Count == 0) {
+            Console.WriteLine("No local hero definitions found. Fetching initial registry from remote...");
+            UpdateHeroMapFromRemote();
+        }
+    }
+
+    static string GetHeroName(int heroId) {
+        if (!heroIdToName.TryGetValue(heroId, out var name)) {
+            Console.WriteLine($"Unknown hero ID {heroId} encountered. Attempting to refresh {HEROES_FILE} from remote...");
+            UpdateHeroMapFromRemote();
+
+            if (!heroIdToName.TryGetValue(heroId, out name)) {
+                name = $"Hero {heroId}";
+            }
+        }
+        return name;
+    }
+
+    static void UpdateHeroMapFromRemote() {
         try {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Add("User-Agent", "Dota2Tracker/1.0");
 
-            string json = await client.GetStringAsync("https://raw.githubusercontent.com/odota/dotaconstants/master/build/heroes.json");
-            using var doc = JsonDocument.Parse(json);
+            string json = client.GetStringAsync("https://raw.githubusercontent.com/odota/dotaconstants/master/build/heroes.json").GetAwaiter().GetResult();
+            ParseHeroMapJson(json);
+            File.WriteAllText(HEROES_FILE, json);
+            Console.WriteLine($"Successfully updated {HEROES_FILE} with {heroIdToName.Count} heroes.");
+        } catch (Exception ex) {
+            Console.WriteLine($"Warning: Failed to update heroes from remote: {ex.Message}");
+        }
+    }
 
-            foreach (var prop in doc.RootElement.EnumerateObject()) {
-                if (int.TryParse(prop.Name, out int heroId)) {
-                    if (prop.Value.TryGetProperty("localized_name", out var locName)) {
-                        var name = locName.GetString();
-                        if (!string.IsNullOrEmpty(name)) {
-                            heroIdToName[heroId] = name;
-                        }
-                    }
+    static void ParseHeroMapJson(string json) {
+        using var doc = JsonDocument.Parse(json);
+        foreach (var prop in doc.RootElement.EnumerateObject()) {
+            if (int.TryParse(prop.Name, out int heroId) && prop.Value.TryGetProperty("localized_name", out var locName)) {
+                var name = locName.GetString();
+                if (!string.IsNullOrEmpty(name)) {
+                    heroIdToName[heroId] = name;
                 }
             }
-            Console.WriteLine($"Loaded {heroIdToName.Count} heroes from dynamic registry.");
-        } catch (Exception ex) {
-            Console.WriteLine($"Warning: Failed to fetch live hero map ({ex.Message}). Fallback names will be used.");
         }
     }
 
@@ -433,7 +463,6 @@ class Program {
         var timeline = LoadExistingProfileTimeline(PROFILE_FILE);
         var latestMilestone = timeline.LastOrDefault();
 
-        // Append a new entry only if it is the first run, or if the rank medal or leaderboard rank changed
         bool hasBadgeChanged = latestMilestone == null ||
                                latestMilestone.RankTier != card.rank_tier ||
                                latestMilestone.LeaderboardRank != card.leaderboard_rank;
@@ -504,17 +533,14 @@ class Program {
 
                 var record = new MatchRecord {
                     MatchId = match.match_id,
-                    StartTime = match.start_time,
-                    Date = FormatTime(match.start_time),
-                    SoloQueue = match.solo_rank,
-                    HeroId = match.hero_id,
-                    HeroName = heroIdToName.TryGetValue(match.hero_id, out var hName) ? hName : $"Hero {match.hero_id}",
                     StartMmr = match.previous_rank,
                     RankChange = match.rank_change,
                     EndMmr = calculatedEndMmr,
-                    IsCalibration = isCalib,
-                    LobbyType = (int)match.lobby_type,
-                    GameMode = (int)match.game_mode
+                    StartTime = match.start_time,
+                    Date = FormatTime(match.start_time),
+                    HeroId = match.hero_id,
+                    HeroName = GetHeroName(match.hero_id),
+                    IsCalibration = isCalib
                 };
 
                 if (!newMatchRecords.ContainsKey(match.match_id)) {
@@ -529,13 +555,13 @@ class Program {
             Console.WriteLine($"Match history pagination complete. Found {newMatchRecords.Count} new ranked matches.");
             historyFetched = true;
 
-            // Enqueue all newly discovered matches for Deep Match Details inspection
+            // Enqueue all newly discovered matches solely to resolve side, win status, and leaver status
             foreach (var mid in newMatchRecords.Keys) {
                 matchDetailsQueue.Enqueue(mid);
             }
 
             if (matchDetailsQueue.Count > 0) {
-                Console.WriteLine($"Enqueuing {matchDetailsQueue.Count} matches for deep scoreboard details...");
+                Console.WriteLine($"Enqueuing {matchDetailsQueue.Count} matches to resolve outcome, side, and leaver status...");
                 FetchNextMatchDetail();
             } else {
                 detailsFetched = true;
@@ -550,14 +576,14 @@ class Program {
 
     static void FetchNextMatchDetail() {
         if (matchDetailsQueue.Count == 0) {
-            Console.WriteLine("Finished fetching all deep match details.");
+            Console.WriteLine("Finished fetching match outcomes.");
             detailsFetched = true;
             CheckSyncCompletion();
             return;
         }
 
         ulong matchId = matchDetailsQueue.Dequeue();
-        Console.WriteLine($"Requesting deep details for match {matchId} ({matchDetailsQueue.Count} remaining)...");
+        Console.WriteLine($"Resolving details for match {matchId} ({matchDetailsQueue.Count} remaining)...");
 
         var req = new ClientGCMsgProtobuf<CMsgGCMatchDetailsRequest>(
             (uint)EDOTAGCMsg.k_EMsgGCMatchDetailsRequest);
@@ -571,102 +597,18 @@ class Program {
         if (msg.Body.match != null) {
             var m = msg.Body.match;
             if (newMatchRecords.TryGetValue(m.match_id, out var record)) {
-                // Match level details
-                record.DurationSeconds = m.duration;
-                record.PreGameDuration = m.pre_game_duration;
-                record.FirstBloodTime = m.first_blood_time;
-                record.Cluster = m.cluster;
-                record.ReplaySalt = m.replay_salt;
-                record.MatchSeqNum = m.match_seq_num;
-                record.HumanPlayers = m.human_players;
-                record.AverageSkill = m.average_skill;
-                record.GameBalance = m.game_balance;
-                record.RadiantTeamScore = m.radiant_team_score;
-                record.DireTeamScore = m.dire_team_score;
-                record.TowerStatus = m.tower_status?.ToList();
-                record.BarracksStatus = m.barracks_status?.ToList();
-                record.MatchOutcome = m.match_outcome.ToString();
-
-                // Radiant Victory corresponds to outcome 2 / RadVictory
                 bool isRadiantWin = (int)m.match_outcome == 2 || m.match_outcome.ToString().Contains("RadVictory");
-
                 uint myAccountId = steamUser.SteamID!.AccountID;
                 var player = m.players.FirstOrDefault(p => p.account_id == myAccountId);
 
                 if (player != null) {
                     bool isRadiant = player.player_slot < 128;
                     bool teamWon = isRadiant ? isRadiantWin : !isRadiantWin;
-                    // leaver_status > 1 represents disconnect too long, manual abandon, or AFK abandon
                     bool didAbandon = player.leaver_status > 1;
-                    
+
                     record.Team = isRadiant ? "radiant" : "dire";
                     record.Win = teamWon && !didAbandon;
-                    record.PlayerSlot = player.player_slot;
-                    record.TeamNumber = (int)player.team_number;
-                    record.TeamSlot = player.team_slot;
-                    record.SelectedFacet = player.selected_facet;
-                    record.Level = player.level;
-
-                    // Combat Metrics
-                    record.Kills = player.kills;
-                    record.Deaths = player.deaths;
-                    record.Assists = player.assists;
-                    record.ScaledKills = player.scaled_kills;
-                    record.ScaledDeaths = player.scaled_deaths;
-                    record.ScaledAssists = player.scaled_assists;
-                    record.Kda = player.deaths > 0 
-                        ? Math.Round((double)(player.kills + player.assists) / player.deaths, 2) 
-                        : Math.Round((double)(player.kills + player.assists), 2);
-
-                    // Farming & Economy
-                    record.LastHits = player.last_hits;
-                    record.Denies = player.denies;
-                    record.ClaimedFarmGold = player.claimed_farm_gold;
-                    record.SupportGold = player.support_gold;
-                    record.ClaimedDenies = player.claimed_denies;
-                    record.ClaimedMisses = player.claimed_misses;
-                    record.Misses = player.misses;
-                    record.NetWorth = player.net_worth;
-                    record.Gold = player.gold;
-                    record.GoldSpent = player.gold_spent;
-                    record.GoldLostToDeath = player.gold_lost_to_death;
-                    record.Gpm = player.gold_per_min;
-                    record.Xpm = player.xp_per_min;
-
-                    // Impact & Laning
-                    record.HeroDamage = player.hero_damage;
-                    record.ScaledHeroDamage = player.scaled_hero_damage;
-                    record.TowerDamage = player.tower_damage;
-                    record.ScaledTowerDamage = player.scaled_tower_damage;
-                    record.HeroHealing = player.hero_healing;
-                    record.ScaledHeroHealing = player.scaled_hero_healing;
-                    record.SupportAbilityValue = player.support_ability_value;
-                    record.FeedingDetected = player.feeding_detected;
-                    record.SecondsDead = player.seconds_dead;
-                    record.BountyRunes = player.bounty_runes;
-                    record.OutpostsCaptured = player.outposts_captured;
-                    record.LaneSelectionFlags = player.lane_selection_flags;
                     record.LeaverStatus = (int)player.leaver_status;
-                    record.PartyId = player.party_id;
-
-                    // Combat Breakdown Lists
-                    record.HeroDamageDealt = ExtractObjectList(player.hero_damage_dealt);
-                    record.HeroDamageReceived = ExtractObjectList(player.hero_damage_received);
-
-                    // Items: Primary (0-5), Backpack (6-8), Neutral (9)
-                    record.Items = new List<int> {
-                        player.item_0, player.item_1, player.item_2,
-                        player.item_3, player.item_4, player.item_5
-                    };
-                    record.Backpack = new List<int> {
-                        player.item_6, player.item_7, player.item_8
-                    };
-                    record.NeutralItem = player.item_9;
-
-                    // Builds & Consumed Buffs via reflection helper
-                    record.AbilityUpgrades = ExtractObjectList(player.ability_upgrades);
-                    record.PermanentBuffs = ExtractObjectList(player.permanent_buffs);
-                    record.AdditionalUnitsInventory = ExtractObjectList(player.additional_units_inventory);
                 }
             }
         }
@@ -737,30 +679,8 @@ class Program {
         File.WriteAllText(path, json);
     }
 
-    static List<Dictionary<string, object?>>? ExtractObjectList(IEnumerable? items) {
-        if (items == null) return null;
-
-        var list = new List<Dictionary<string, object?>>();
-        foreach (var item in items) {
-            if (item == null) continue;
-            var entry = new Dictionary<string, object?>();
-            foreach (var prop in item.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
-                if (prop.Name == "ExtensionObject") continue;
-                try {
-                    var val = prop.GetValue(item);
-                    if (val != null) {
-                        entry[prop.Name] = val;
-                    }
-                } catch { }
-            }
-            if (entry.Count > 0) list.Add(entry);
-        }
-
-        return list.Count > 0 ? list : null;
-    }
-
     static string FormatTime(uint unixTime) {
-        return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).ToLocalTime().AddSeconds(unixTime).ToString("yyyy-MM-dd HH:mm:ss");
+        return DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'");
     }
 
     static string GetRankTierName(uint tier) {
@@ -889,32 +809,9 @@ class Program {
     }
 
     public class MatchRecord {
-        // --- Core History Identifiers ---
         [JsonPropertyName("match_id")]
         public ulong MatchId { get; set; }
 
-        [JsonPropertyName("match_seq_num")]
-        public ulong? MatchSeqNum { get; set; }
-
-        [JsonPropertyName("date")]
-        public string Date { get; set; } = string.Empty;
-
-        [JsonPropertyName("unix_time")]
-        public uint StartTime { get; set; }
-
-        [JsonPropertyName("solo_queue")]
-        public bool SoloQueue { get; set; }
-
-        [JsonPropertyName("lobby_type")]
-        public int LobbyType { get; set; }
-
-        [JsonPropertyName("game_mode")]
-        public int GameMode { get; set; }
-
-        [JsonPropertyName("is_calibration")]
-        public bool IsCalibration { get; set; }
-
-        // --- MMR Metrics ---
         [JsonPropertyName("start_mmr")]
         public uint StartMmr { get; set; }
 
@@ -924,203 +821,28 @@ class Program {
         [JsonPropertyName("end_mmr")]
         public uint? EndMmr { get; set; }
 
-        // --- Hero Information ---
+        [JsonPropertyName("unix_time")]
+        public uint StartTime { get; set; }
+
+        [JsonPropertyName("date")]
+        public string Date { get; set; } = string.Empty;
+
+        [JsonPropertyName("team")]
+        public string Team { get; set; } = string.Empty;
+
         [JsonPropertyName("hero_id")]
         public int HeroId { get; set; }
 
         [JsonPropertyName("hero_name")]
         public string HeroName { get; set; } = string.Empty;
 
-        [JsonPropertyName("selected_facet")]
-        public uint? SelectedFacet { get; set; }
-
-        // --- Match Level Scoreboard ---
-        [JsonPropertyName("duration_seconds")]
-        public uint? DurationSeconds { get; set; }
-
-        [JsonPropertyName("pre_game_duration")]
-        public uint? PreGameDuration { get; set; }
-
-        [JsonPropertyName("first_blood_time")]
-        public uint? FirstBloodTime { get; set; }
-
-        [JsonPropertyName("cluster")]
-        public uint? Cluster { get; set; }
-
-        [JsonPropertyName("replay_salt")]
-        public uint? ReplaySalt { get; set; }
-
-        [JsonPropertyName("human_players")]
-        public uint? HumanPlayers { get; set; }
-
-        [JsonPropertyName("average_skill")]
-        public uint? AverageSkill { get; set; }
-
-        [JsonPropertyName("game_balance")]
-        public float? GameBalance { get; set; }
-
-        [JsonPropertyName("radiant_team_score")]
-        public uint? RadiantTeamScore { get; set; }
-
-        [JsonPropertyName("dire_team_score")]
-        public uint? DireTeamScore { get; set; }
-
-        [JsonPropertyName("tower_status")]
-        public List<uint>? TowerStatus { get; set; }
-
-        [JsonPropertyName("barracks_status")]
-        public List<uint>? BarracksStatus { get; set; }
-
-        [JsonPropertyName("match_outcome")]
-        public string? MatchOutcome { get; set; }
-
-        // --- Player Outcome & Identity ---
-        [JsonPropertyName("win")]
-        public bool? Win { get; set; }
-
-        [JsonPropertyName("team")]
-        public string? Team { get; set; }
-
-        [JsonPropertyName("team_number")]
-        public int? TeamNumber { get; set; }
-
-        [JsonPropertyName("team_slot")]
-        public uint? TeamSlot { get; set; }
-
-        [JsonPropertyName("player_slot")]
-        public uint? PlayerSlot { get; set; }
-
-        [JsonPropertyName("party_id")]
-        public ulong? PartyId { get; set; }
-
-        [JsonPropertyName("level")]
-        public uint? Level { get; set; }
-
         [JsonPropertyName("leaver_status")]
-        public int? LeaverStatus { get; set; }
+        public int LeaverStatus { get; set; }
 
-        // --- Combat Performance ---
-        [JsonPropertyName("kills")]
-        public uint? Kills { get; set; }
+        [JsonPropertyName("win")]
+        public bool Win { get; set; }
 
-        [JsonPropertyName("deaths")]
-        public uint? Deaths { get; set; }
-
-        [JsonPropertyName("assists")]
-        public uint? Assists { get; set; }
-
-        [JsonPropertyName("kda")]
-        public double? Kda { get; set; }
-
-        [JsonPropertyName("scaled_kills")]
-        public float? ScaledKills { get; set; }
-
-        [JsonPropertyName("scaled_deaths")]
-        public float? ScaledDeaths { get; set; }
-
-        [JsonPropertyName("scaled_assists")]
-        public float? ScaledAssists { get; set; }
-
-        // --- Farming & Economy ---
-        [JsonPropertyName("last_hits")]
-        public uint? LastHits { get; set; }
-
-        [JsonPropertyName("denies")]
-        public uint? Denies { get; set; }
-
-        [JsonPropertyName("claimed_farm_gold")]
-        public uint? ClaimedFarmGold { get; set; }
-
-        [JsonPropertyName("support_gold")]
-        public uint? SupportGold { get; set; }
-
-        [JsonPropertyName("claimed_denies")]
-        public uint? ClaimedDenies { get; set; }
-
-        [JsonPropertyName("claimed_misses")]
-        public uint? ClaimedMisses { get; set; }
-
-        [JsonPropertyName("misses")]
-        public uint? Misses { get; set; }
-
-        [JsonPropertyName("net_worth")]
-        public uint? NetWorth { get; set; }
-
-        [JsonPropertyName("gold")]
-        public uint? Gold { get; set; }
-
-        [JsonPropertyName("gold_spent")]
-        public uint? GoldSpent { get; set; }
-
-        [JsonPropertyName("gold_lost_to_death")]
-        public uint? GoldLostToDeath { get; set; }
-
-        [JsonPropertyName("gpm")]
-        public uint? Gpm { get; set; }
-
-        [JsonPropertyName("xpm")]
-        public uint? Xpm { get; set; }
-
-        // --- Damage & Impact ---
-        [JsonPropertyName("hero_damage")]
-        public uint? HeroDamage { get; set; }
-
-        [JsonPropertyName("scaled_hero_damage")]
-        public uint? ScaledHeroDamage { get; set; }
-
-        [JsonPropertyName("tower_damage")]
-        public uint? TowerDamage { get; set; }
-
-        [JsonPropertyName("scaled_tower_damage")]
-        public uint? ScaledTowerDamage { get; set; }
-
-        [JsonPropertyName("hero_healing")]
-        public uint? HeroHealing { get; set; }
-
-        [JsonPropertyName("scaled_hero_healing")]
-        public uint? ScaledHeroHealing { get; set; }
-
-        [JsonPropertyName("support_ability_value")]
-        public uint? SupportAbilityValue { get; set; }
-
-        [JsonPropertyName("feeding_detected")]
-        public bool? FeedingDetected { get; set; }
-
-        [JsonPropertyName("seconds_dead")]
-        public uint? SecondsDead { get; set; }
-
-        [JsonPropertyName("bounty_runes")]
-        public uint? BountyRunes { get; set; }
-
-        [JsonPropertyName("outposts_captured")]
-        public uint? OutpostsCaptured { get; set; }
-
-        [JsonPropertyName("lane_selection_flags")]
-        public uint? LaneSelectionFlags { get; set; }
-        
-        [JsonPropertyName("hero_damage_dealt")]
-        public List<Dictionary<string, object?>>? HeroDamageDealt { get; set; }
-        
-        [JsonPropertyName("hero_damage_received")]
-        public List<Dictionary<string, object?>>? HeroDamageReceived { get; set; }
-
-        // --- Items, Builds, and Buffs ---
-        [JsonPropertyName("items")]
-        public List<int>? Items { get; set; }
-
-        [JsonPropertyName("backpack")]
-        public List<int>? Backpack { get; set; }
-
-        [JsonPropertyName("neutral_item")]
-        public int? NeutralItem { get; set; }
-
-        [JsonPropertyName("ability_upgrades")]
-        public List<Dictionary<string, object?>>? AbilityUpgrades { get; set; }
-
-        [JsonPropertyName("permanent_buffs")]
-        public List<Dictionary<string, object?>>? PermanentBuffs { get; set; }
-
-        [JsonPropertyName("additional_units_inventory")]
-        public List<Dictionary<string, object?>>? AdditionalUnitsInventory { get; set; }
+        [JsonPropertyName("is_calibration")]
+        public bool IsCalibration { get; set; }
     }
 }
