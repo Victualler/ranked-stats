@@ -19,7 +19,6 @@
   <!-- Chart.js CDN for MMR progression graph -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
   <style>
     :root {
       --bg: #0f141c;
@@ -30,6 +29,8 @@
       --win: #22c55e;
       --loss: #ef4444;
       --accent: #38bdf8;
+      --radiant: #3b82f6;
+      --dire: #f97316;
     }
 
     * {
@@ -169,16 +170,17 @@
       border-radius: 4px;
       font-size: 0.75rem;
       font-weight: 600;
+      text-transform: capitalize;
     }
 
-    .badge-solo {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
+    .badge-radiant {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--radiant);
     }
 
-    .badge-party {
-      background: rgba(148, 163, 184, 0.15);
-      color: var(--text-muted);
+    .badge-dire {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--dire);
     }
 
     .loading, .error {
@@ -225,25 +227,28 @@
     <section class="table-container">
       <table>
         <thead>
-          <tr>
-            <th>Date</th>
-            <th>Hero</th>
-            <th>Queue</th>
-            <th>Change</th>
-            <th>End MMR</th>
-            <th>Match ID</th>
-          </tr>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Hero</th>
+              <th>Side</th>
+              <th>Result</th>
+              <th>Change</th>
+              <th>End MMR</th>
+              <th>Match ID</th>
+            </tr>
+          </thead>
         </thead>
         <tbody id="matchesBody">
           <tr>
-            <td colspan="6" class="loading">Loading match data...</td>
+            <td colspan="7" class="loading">Loading match data...</td>
           </tr>
         </tbody>
       </table>
     </section>
   </div>
 
-  <script>
+<script>
     let chartInstance = null;
 
     async function loadMatches() {
@@ -251,24 +256,22 @@
       const lastUpdatedEl = document.getElementById('lastUpdated');
 
       try {
-        // Cache-busting query parameter + no-store header to bypass CDN and browser caching
-        const response = await fetch(`matches.json?t=${Date.now()}`, {
+        const response = await fetch(`./data/matches.json?t=${Date.now()}`, {
           cache: 'no-store'
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to load matches.json (HTTP ${response.status})`);
+          throw new Error(`Failed to load data/matches.json (HTTP ${response.status})`);
         }
 
         const matches = await response.json();
 
         if (!Array.isArray(matches) || matches.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="error">No matches found in matches.json.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="error">No matches found in data/matches.json.</td></tr>';
           lastUpdatedEl.textContent = 'No records available.';
           return;
         }
 
-        // matches.json is ordered newest -> oldest
         renderStats(matches);
         renderChart(matches);
         renderTable(matches);
@@ -276,33 +279,36 @@
         lastUpdatedEl.textContent = `Latest Match: ${matches[0].date}`;
       } catch (err) {
         console.error(err);
-        tbody.innerHTML = `<tr><td colspan="6" class="error">Error loading data: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="error">Error loading data: ${err.message}</td></tr>`;
         lastUpdatedEl.textContent = 'Failed to fetch latest data.';
       }
     }
 
     function renderStats(matches) {
       const latest = matches[0];
-      const endMmr = latest.start_mmr + latest.rank_change;
-      
-      const allEndMmrs = matches.map(m => m.start_mmr + m.rank_change);
-      const peakMmr = Math.max(...allEndMmrs);
+      const currentMmr = latest.end_mmr !== null ? latest.end_mmr.toLocaleString() : 'Calibrating';
 
-      const wins = matches.filter(m => m.rank_change > 0).length;
+      // Peak MMR considers any matches with recorded numerical MMR
+      const validMmrs = matches
+        .map(m => m.end_mmr)
+        .filter(v => typeof v === 'number');
+      const peakMmr = validMmrs.length > 0 ? Math.max(...validMmrs).toLocaleString() : '--';
+
+      const wins = matches.filter(m => m.win === true).length;
       const winRate = ((wins / matches.length) * 100).toFixed(1);
 
-      document.getElementById('currentMmr').textContent = endMmr.toLocaleString();
-      document.getElementById('peakMmr').textContent = peakMmr.toLocaleString();
+      document.getElementById('currentMmr').textContent = currentMmr;
+      document.getElementById('peakMmr').textContent = peakMmr;
       document.getElementById('winRate').textContent = `${winRate}%`;
       document.getElementById('totalMatches').textContent = matches.length.toLocaleString();
     }
 
     function renderChart(matches) {
-      // Reverse to chronological order (oldest to newest) for charting
+      // Retain all matches including calibration games in chronological order
       const chronological = [...matches].reverse();
 
       const labels = chronological.map(m => m.date.split(' ')[0]);
-      const data = chronological.map(m => m.start_mmr + m.rank_change);
+      const data = chronological.map(m => m.end_mmr);
 
       const ctx = document.getElementById('mmrChart').getContext('2d');
 
@@ -323,7 +329,8 @@
             pointRadius: data.length > 50 ? 0 : 3,
             pointHoverRadius: 5,
             fill: true,
-            tension: 0.15
+            tension: 0.15,
+            spanGaps: true // Connects the trendline across calibration matches (null points)
           }]
         },
         options: {
@@ -333,7 +340,10 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: (context) => ` MMR: ${context.parsed.y}`
+                label: (context) => {
+                  const val = context.raw;
+                  return val !== null && val !== undefined ? ` MMR: ${val}` : ' Calibrating';
+                }
               }
             }
           },
@@ -355,26 +365,33 @@
       const tbody = document.getElementById('matchesBody');
       tbody.innerHTML = '';
 
-      // Display up to the latest 100 matches in the table view
       const displaySubset = matches.slice(0, 100);
 
       displaySubset.forEach(match => {
         const tr = document.createElement('tr');
 
-        const isWin = match.rank_change > 0;
-        const changeClass = isWin ? 'win' : 'loss';
-        const formattedChange = isWin ? `+${match.rank_change}` : `${match.rank_change}`;
-        const finalMmr = match.start_mmr + match.rank_change;
+        const isWin = match.win;
+        const outcomeClass = isWin ? 'win' : 'loss';
+        const outcomeText = isWin ? 'Won' : 'Lost';
+
+        let formattedChange = '—';
+        if (match.rank_change !== 0) {
+          formattedChange = match.rank_change > 0 ? `+${match.rank_change}` : `${match.rank_change}`;
+        }
+
+        const finalMmr = match.end_mmr !== null ? match.end_mmr.toLocaleString() : 'Calibrating';
+        const teamClass = match.team === 'radiant' ? 'badge-radiant' : 'badge-dire';
 
         tr.innerHTML = `
           <td>${match.date}</td>
-          <td><strong>${match.hero_name}</strong></td>
+          <td><strong>${match.hero_name || `Hero ${match.hero_id}`}</strong></td>
           <td>
-            <span class="badge ${match.solo_queue ? 'badge-solo' : 'badge-party'}">
-              ${match.solo_queue ? 'Solo' : 'Party'}
+            <span class="badge ${teamClass}">
+              ${match.team || '—'}
             </span>
           </td>
-          <td class="${changeClass}">${formattedChange}</td>
+          <td class="${outcomeClass}">${outcomeText}</td>
+          <td class="${outcomeClass}">${formattedChange}</td>
           <td>${finalMmr}</td>
           <td>
             <a href="https://www.opendota.com/matches/${match.match_id}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">
@@ -387,7 +404,6 @@
       });
     }
 
-    // Initial load on page entry
     loadMatches();
   </script>
 </body>
