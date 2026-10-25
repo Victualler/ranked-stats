@@ -168,18 +168,6 @@ class Program {
         }
     }
 
-    static string GetHeroName(int heroId) {
-        if (!heroIdToName.TryGetValue(heroId, out var name)) {
-            Console.WriteLine($"Unknown hero ID {heroId} encountered. Attempting to refresh {HEROES_FILE} from remote...");
-            UpdateHeroMapFromRemote();
-
-            if (!heroIdToName.TryGetValue(heroId, out name)) {
-                name = $"Hero {heroId}";
-            }
-        }
-        return name;
-    }
-
     static void UpdateHeroMapFromRemote() {
         try {
             using var client = new HttpClient();
@@ -424,7 +412,11 @@ class Program {
         };
 
         if (messageMap.TryGetValue(callback.EMsg, out var func)) {
-            func(callback.Message);
+            try {
+                func(callback.Message);
+            } catch (Exception ex) {
+                Console.Error.WriteLine($"[GC Handler Error] Exception handling message {callback.EMsg}: {ex.Message}");
+            }
         }
     }
 
@@ -454,6 +446,13 @@ class Program {
 
     static void OnProfileCard(IPacketGCMsg packetMsg) {
         var msg = new ClientGCMsgProtobuf<CMsgDOTAProfileCard>(packetMsg);
+        if (msg.Body == null) {
+            Console.Error.WriteLine("[GC Warning] Received null Profile Card body.");
+            profileFetched = true;
+            CheckSyncCompletion();
+            return;
+        }
+
         Console.WriteLine($"Received Profile Card. Rank Tier: {msg.Body.rank_tier}, Leaderboard: {msg.Body.leaderboard_rank}");
 
         ProcessProfileBadgeTimeline(msg.Body);
@@ -512,38 +511,53 @@ class Program {
     }
 
     static void OnMatchHistory(IPacketGCMsg packetMsg) {
-        var msg = new ClientGCMsgProtobuf<CMsgDOTAGetPlayerMatchHistoryResponse>(packetMsg);
-        bool reachedExistingMatch = false;
+        try {
+            var msg = new ClientGCMsgProtobuf<CMsgDOTAGetPlayerMatchHistoryResponse>(packetMsg);
 
-        foreach (var match in msg.Body.matches) {
-            // Stop condition: reach the most recently recorded match ID
-            if (match.match_id == latest_saved_mid) {
-                reachedExistingMatch = true;
-                if (matches_count < 0) {
-                    matches_remaining = 0;
-                }
-                break;
+            if (msg.Body.matches == null) {
+                Console.Error.WriteLine("[GC Warning] Received null matches list from match history response.");
+                historyFetched = true;
+                detailsFetched = true;
+                CheckSyncCompletion();
+                return;
             }
 
-            // Identify ranked matches (captures standard ranked and calibration games)
-            bool isRanked = match.lobby_type == 7 || match.previous_rank != 0 || match.rank_change != 0;
+            bool reachedExistingMatch = false;
 
-            if (isRanked && match.start_time != 0 && match.match_id != 0) {
+            foreach (var match in msg.Body.matches) {
+                // Stop condition: reach the most recently recorded match ID
+                if (match.match_id == latest_saved_mid) {
+                    reachedExistingMatch = true;
+                    if (matches_count < 0) {
+                        matches_remaining = 0;
+                    }
+                    break;
+                }
+
+                // Identify ranked matches (captures standard ranked and calibration games)
+                bool isRanked = match.lobby_type == 7 || match.previous_rank != 0 || match.rank_change != 0;
+
+                if (!isRanked) {
+                    Console.WriteLine($"[GC Debug] Match {match.match_id} skipped: Not recognized as ranked (lobby_type: {match.lobby_type}, previous_rank: {match.previous_rank}, rank_change: {match.rank_change}).");
+                    matches_start_at_id = match.match_id;
+                    continue;
+                }
+
+                if (match.start_time == 0 || match.match_id == 0) {
+                    Console.Error.WriteLine($"[GC Warning] Malformed match record detected (match_id: {match.match_id}, start_time: {match.start_time}). Skipping.");
+                    matches_start_at_id = match.match_id;
+                    continue;
+                }
+
                 bool isCalib = match.previous_rank == 0 && match.rank_change == 0;
-                uint? calculatedEndMmr = (!isCalib && match.previous_rank > 0)
-                    ? (uint)Math.Max(0, (int)match.previous_rank + match.rank_change)
-                    : null;
 
                 var entry = new MatchEntry {
                     Gc = new GcData {
                         MatchId = match.match_id,
+                        StartTime = match.start_time,
+                        HeroId = match.hero_id,
                         StartMmr = match.previous_rank,
                         RankChange = match.rank_change,
-                        EndMmr = calculatedEndMmr,
-                        StartTime = match.start_time,
-                        Date = FormatTime(match.start_time),
-                        HeroId = match.hero_id,
-                        HeroName = GetHeroName(match.hero_id),
                         IsCalibration = isCalib
                     },
                     OpenDota = null
@@ -552,31 +566,35 @@ class Program {
                 if (!newMatchRecords.ContainsKey(match.match_id)) {
                     newMatchRecords[match.match_id] = entry;
                 }
+
+                matches_start_at_id = match.match_id;
             }
 
-            matches_start_at_id = match.match_id;
-        }
+            if (reachedExistingMatch || matches_remaining <= 0 || msg.Body.matches.Count == 0 || msg.Body.matches.Count < matches_requested) {
+                Console.WriteLine($"Match history pagination complete. Found {newMatchRecords.Count} new ranked matches.");
+                historyFetched = true;
 
-        if (reachedExistingMatch || matches_remaining <= 0 || msg.Body.matches.Count == 0 || msg.Body.matches.Count < matches_requested) {
-            Console.WriteLine($"Match history pagination complete. Found {newMatchRecords.Count} new ranked matches.");
-            historyFetched = true;
+                // Enqueue all newly discovered matches solely to resolve win status
+                foreach (var mid in newMatchRecords.Keys) {
+                    matchDetailsQueue.Enqueue(mid);
+                }
 
-            // Enqueue all newly discovered matches solely to resolve side, win status, and leaver status
-            foreach (var mid in newMatchRecords.Keys) {
-                matchDetailsQueue.Enqueue(mid);
-            }
-
-            if (matchDetailsQueue.Count > 0) {
-                Console.WriteLine($"Enqueuing {matchDetailsQueue.Count} matches to resolve outcome, side, and leaver status...");
-                FetchNextMatchDetail();
+                if (matchDetailsQueue.Count > 0) {
+                    Console.WriteLine($"Enqueuing {matchDetailsQueue.Count} matches to resolve outcome and leaver status...");
+                    FetchNextMatchDetail();
+                } else {
+                    detailsFetched = true;
+                    CheckSyncCompletion();
+                }
             } else {
-                detailsFetched = true;
-                CheckSyncCompletion();
+                Thread.Sleep(1000); // Respect GC 1 req/sec rate limit
+                Console.WriteLine($"Fetched page. Next start_at_match_id: {matches_start_at_id}");
+                FetchMatches();
             }
-        } else {
-            Thread.Sleep(1000); // Respect GC 1 req/sec rate limit
-            Console.WriteLine($"Fetched page. Next start_at_match_id: {matches_start_at_id}");
-            FetchMatches();
+        } catch (Exception ex) {
+            Console.Error.WriteLine($"[GC Error] Failed to process match history response: {ex.Message}");
+            isRunning = false;
+            steamClient.Disconnect();
         }
     }
 
@@ -598,30 +616,48 @@ class Program {
     }
 
     static void OnMatchDetails(IPacketGCMsg packetMsg) {
-        var msg = new ClientGCMsgProtobuf<CMsgGCMatchDetailsResponse>(packetMsg);
+        try {
+            var msg = new ClientGCMsgProtobuf<CMsgGCMatchDetailsResponse>(packetMsg);
 
-        if (msg.Body.match != null) {
-            var m = msg.Body.match;
-            if (newMatchRecords.TryGetValue(m.match_id, out var entry)) {
-                bool isRadiantWin = (int)m.match_outcome == 2 || m.match_outcome.ToString().Contains("RadVictory");
-                uint myAccountId = steamUser.SteamID!.AccountID;
-                var player = m.players.FirstOrDefault(p => p.account_id == myAccountId);
-
-                if (player != null) {
-                    bool isRadiant = player.player_slot < 128;
-                    bool teamWon = isRadiant ? isRadiantWin : !isRadiantWin;
-                    bool didAbandon = player.leaver_status > 1;
-
-                    entry.Gc.Team = isRadiant ? "radiant" : "dire";
-                    entry.Gc.Win = teamWon && !didAbandon;
-                    entry.Gc.LeaverStatus = (int)player.leaver_status;
-                }
+            if (msg.Body.match == null) {
+                Console.Error.WriteLine("[GC Warning] Received null match details payload from GC.");
+                return;
             }
-        }
 
-        // Respect GC 1 req/sec rate limit before triggering next detail query
-        Thread.Sleep(1000);
-        FetchNextMatchDetail();
+            var m = msg.Body.match;
+            if (!newMatchRecords.TryGetValue(m.match_id, out var entry)) {
+                Console.WriteLine($"[GC Notice] Received details for untracked match {m.match_id}.");
+                return;
+            }
+
+            uint myAccountId = steamUser.SteamID!.AccountID;
+            var player = m.players.FirstOrDefault(p => p.account_id == myAccountId);
+
+            if (player == null) {
+                Console.Error.WriteLine($"[GC Warning] Match {m.match_id}: Account ID {myAccountId} not found in player list! Total players: {m.players.Count}. Win outcome could not be resolved.");
+                return;
+            }
+
+            int outcomeVal = (int)m.match_outcome;
+            string outcomeStr = m.match_outcome.ToString();
+            bool isRadiantWin = outcomeVal == 2 || outcomeStr.Contains("RadVictory");
+
+            if (outcomeVal == 0 && !outcomeStr.Contains("Victory")) {
+                Console.Error.WriteLine($"[GC Warning] Match {m.match_id}: Unknown or unpopulated match_outcome value: '{m.match_outcome}' ({outcomeVal}).");
+            }
+
+            bool isRadiant = player.player_slot < 128;
+            bool teamWon = isRadiant ? isRadiantWin : !isRadiantWin;
+            bool didAbandon = player.leaver_status > 1;
+
+            entry.Gc.Win = teamWon && !didAbandon;
+        } catch (Exception ex) {
+            Console.Error.WriteLine($"[GC Error] Failed to process match details: {ex.Message}");
+        } finally {
+            // Respect GC 1 req/sec rate limit before triggering next detail query
+            Thread.Sleep(1000);
+            FetchNextMatchDetail();
+        }
     }
 
     static void CheckSyncCompletion() {
@@ -683,10 +719,6 @@ class Program {
         };
         string json = JsonSerializer.Serialize(timeline, options);
         File.WriteAllText(path, json);
-    }
-
-    static string FormatTime(uint unixTime) {
-        return DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'");
     }
 
     static string GetRankTierName(uint tier) {
@@ -827,37 +859,22 @@ class Program {
         [JsonPropertyName("match_id")]
         public ulong MatchId { get; set; }
 
+        [JsonPropertyName("unix_time")]
+        public uint StartTime { get; set; }
+
+        [JsonPropertyName("hero_id")]
+        public int HeroId { get; set; }
+
         [JsonPropertyName("start_mmr")]
         public uint StartMmr { get; set; }
 
         [JsonPropertyName("rank_change")]
         public int RankChange { get; set; }
 
-        [JsonPropertyName("end_mmr")]
-        public uint? EndMmr { get; set; }
-
-        [JsonPropertyName("unix_time")]
-        public uint StartTime { get; set; }
-
-        [JsonPropertyName("date")]
-        public string Date { get; set; } = string.Empty;
-
-        [JsonPropertyName("team")]
-        public string Team { get; set; } = string.Empty;
-
-        [JsonPropertyName("hero_id")]
-        public int HeroId { get; set; }
-
-        [JsonPropertyName("hero_name")]
-        public string HeroName { get; set; } = string.Empty;
-
-        [JsonPropertyName("leaver_status")]
-        public int LeaverStatus { get; set; }
+        [JsonPropertyName("is_calibration")]
+        public bool IsCalibration { get; set; }
 
         [JsonPropertyName("win")]
         public bool Win { get; set; }
-
-        [JsonPropertyName("is_calibration")]
-        public bool IsCalibration { get; set; }
     }
 }
