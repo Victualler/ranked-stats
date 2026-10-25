@@ -4,3 +4,4 @@ cellid.txt
 servers_list.bin
 *.auth
 *.csv
+*.tmp
