@@ -3,6 +3,10 @@ name: stats-sync
 on:
   workflow_dispatch:
 
+concurrency:
+  group: dota-tracker-sync
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: write
