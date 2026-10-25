@@ -56,8 +56,8 @@ class Program {
     static bool profileFetched = false;
     static readonly Queue<ulong> matchDetailsQueue = new();
 
-    static List<MatchRecord> existingMatches = new();
-    static Dictionary<ulong, MatchRecord> newMatchRecords = new();
+    static List<MatchEntry> existingMatches = new();
+    static Dictionary<ulong, MatchEntry> newMatchRecords = new();
     static Dictionary<int, string> heroIdToName = new();
 
     static async Task<int> Main(string[] args) {
@@ -86,7 +86,7 @@ class Program {
 
         // 4. Load existing matches.json to determine latest saved match ID
         existingMatches = LoadExistingMatches(OUTPUT_FILE);
-        latest_saved_mid = existingMatches.Count > 0 ? existingMatches[0].MatchId : 0;
+        latest_saved_mid = existingMatches.Count > 0 ? existingMatches[0].Gc.MatchId : 0;
         Console.WriteLine($"Loaded {existingMatches.Count} existing matches. Latest Match ID: {latest_saved_mid}");
 
         matches_remaining = matches_count > 0 ? matches_count : int.MaxValue;
@@ -122,15 +122,15 @@ class Program {
         // 6. Merge, sort, and save matches
         if (newMatchRecords.Count > 0) {
             Console.WriteLine($"Merging {newMatchRecords.Count} newly fetched ranked matches...");
-            var combinedMap = new Dictionary<ulong, MatchRecord>();
+            var combinedMap = new Dictionary<ulong, MatchEntry>();
 
             foreach (var match in newMatchRecords.Values.Concat(existingMatches)) {
-                if (!combinedMap.ContainsKey(match.MatchId)) {
-                    combinedMap[match.MatchId] = match;
+                if (!combinedMap.ContainsKey(match.Gc.MatchId)) {
+                    combinedMap[match.Gc.MatchId] = match;
                 }
             }
 
-            var sortedList = combinedMap.Values.OrderByDescending(m => m.StartTime).ToList();
+            var sortedList = combinedMap.Values.OrderByDescending(m => m.Gc.StartTime).ToList();
 
             // Monotonic count check: prevent silent data truncation or accidental empty writes
             if (sortedList.Count < existingMatches.Count) {
@@ -534,20 +534,23 @@ class Program {
                     ? (uint)Math.Max(0, (int)match.previous_rank + match.rank_change)
                     : null;
 
-                var record = new MatchRecord {
-                    MatchId = match.match_id,
-                    StartMmr = match.previous_rank,
-                    RankChange = match.rank_change,
-                    EndMmr = calculatedEndMmr,
-                    StartTime = match.start_time,
-                    Date = FormatTime(match.start_time),
-                    HeroId = match.hero_id,
-                    HeroName = GetHeroName(match.hero_id),
-                    IsCalibration = isCalib
+                var entry = new MatchEntry {
+                    Gc = new GcData {
+                        MatchId = match.match_id,
+                        StartMmr = match.previous_rank,
+                        RankChange = match.rank_change,
+                        EndMmr = calculatedEndMmr,
+                        StartTime = match.start_time,
+                        Date = FormatTime(match.start_time),
+                        HeroId = match.hero_id,
+                        HeroName = GetHeroName(match.hero_id),
+                        IsCalibration = isCalib
+                    },
+                    OpenDota = null
                 };
 
                 if (!newMatchRecords.ContainsKey(match.match_id)) {
-                    newMatchRecords[match.match_id] = record;
+                    newMatchRecords[match.match_id] = entry;
                 }
             }
 
@@ -599,7 +602,7 @@ class Program {
 
         if (msg.Body.match != null) {
             var m = msg.Body.match;
-            if (newMatchRecords.TryGetValue(m.match_id, out var record)) {
+            if (newMatchRecords.TryGetValue(m.match_id, out var entry)) {
                 bool isRadiantWin = (int)m.match_outcome == 2 || m.match_outcome.ToString().Contains("RadVictory");
                 uint myAccountId = steamUser.SteamID!.AccountID;
                 var player = m.players.FirstOrDefault(p => p.account_id == myAccountId);
@@ -609,9 +612,9 @@ class Program {
                     bool teamWon = isRadiant ? isRadiantWin : !isRadiantWin;
                     bool didAbandon = player.leaver_status > 1;
 
-                    record.Team = isRadiant ? "radiant" : "dire";
-                    record.Win = teamWon && !didAbandon;
-                    record.LeaverStatus = (int)player.leaver_status;
+                    entry.Gc.Team = isRadiant ? "radiant" : "dire";
+                    entry.Gc.Win = teamWon && !didAbandon;
+                    entry.Gc.LeaverStatus = (int)player.leaver_status;
                 }
             }
         }
@@ -634,22 +637,22 @@ class Program {
     // File I/O & Helpers
     // -----------------------------------------------------------------------------------------
 
-    static List<MatchRecord> LoadExistingMatches(string path) {
-        if (!File.Exists(path)) return new List<MatchRecord>();
+    static List<MatchEntry> LoadExistingMatches(string path) {
+        if (!File.Exists(path)) return new List<MatchEntry>();
 
         try {
             string json = File.ReadAllText(path);
-            var records = JsonSerializer.Deserialize<List<MatchRecord>>(json);
-            return records ?? new List<MatchRecord>();
+            var records = JsonSerializer.Deserialize<List<MatchEntry>>(json);
+            return records ?? new List<MatchEntry>();
         } catch (Exception ex) {
             Console.WriteLine($"Notice: Unable to parse existing {path}: {ex.Message}. Starting fresh.");
-            return new List<MatchRecord>();
+            return new List<MatchEntry>();
         }
     }
 
-    static void SaveMatchesToJson(List<MatchRecord> records, string path) {
+    static void SaveMatchesToJson(List<MatchEntry> records, string path) {
         var options = new JsonSerializerOptions { 
-            WriteIndented = true,
+            WriteIndented = true, 
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
         };
         string json = JsonSerializer.Serialize(records, options);
@@ -675,7 +678,7 @@ class Program {
 
     static void SaveProfileTimelineToJson(List<ProfileBadgeMilestone> timeline, string path) {
         var options = new JsonSerializerOptions { 
-            WriteIndented = true,
+            WriteIndented = true, 
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
         };
         string json = JsonSerializer.Serialize(timeline, options);
@@ -811,7 +814,16 @@ class Program {
         public uint LeaderboardRankCore { get; set; }
     }
 
-    public class MatchRecord {
+    public class MatchEntry {
+        [JsonPropertyName("gc")]
+        public GcData Gc { get; set; } = new();
+
+        [JsonPropertyName("opendota")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public object? OpenDota { get; set; } = null;
+    }
+
+    public class GcData {
         [JsonPropertyName("match_id")]
         public ulong MatchId { get; set; }
 
