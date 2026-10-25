@@ -168,10 +168,14 @@ class Program {
                 Console.WriteLine($"Enriching match {mid} via OpenDota...");
 
                 try {
-                    // Strictly enforce OpenDota free tier rate limit (< 60 req/min)
                     await Task.Delay(1200);
 
                     var response = await httpClient.GetAsync($"https://api.opendota.com/api/matches/{mid}");
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests) {
+                        Console.WriteLine("[OpenDota Warning] Rate limited (HTTP 429). Deferring remaining enrichment to the next run.");
+                        break;
+                    }
 
                     if (response.StatusCode == System.Net.HttpStatusCode.NotFound) {
                         Console.WriteLine($"[OpenDota Notice] Match {mid} not yet indexed by OpenDota (404). Will retry on subsequent runs.");
@@ -409,7 +413,10 @@ class Program {
 
             var response = await ssmClient.GetParameterAsync(request);
             if (response?.Parameter?.Value != null) {
-                loadedSsmSecrets = JsonSerializer.Deserialize<SteamSecrets>(response.Parameter.Value);
+                loadedSsmSecrets = JsonSerializer.Deserialize<SteamSecrets>(response.Parameter.Value, new JsonSerializerOptions {
+                    PropertyNameCaseInsensitive = true
+                });
+
                 if (loadedSsmSecrets != null) {
                     user = loadedSsmSecrets.AccountName ?? string.Empty;
                     pass = loadedSsmSecrets.Password ?? string.Empty;
@@ -883,7 +890,9 @@ class Program {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
         string json = JsonSerializer.Serialize(records, options);
-        File.WriteAllText(path, json);
+        string tempFile = path + ".tmp";
+        File.WriteAllText(tempFile, json);
+        File.Move(tempFile, path, overwrite: true);
     }
 
     static List<ProfileBadgeMilestone> LoadExistingProfileTimeline(string path) {
@@ -909,7 +918,9 @@ class Program {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
         string json = JsonSerializer.Serialize(timeline, options);
-        File.WriteAllText(path, json);
+        string tempFile = path + ".tmp";
+        File.WriteAllText(tempFile, json);
+        File.Move(tempFile, path, overwrite: true);
     }
 
     static string GetRankTierName(uint tier) {
@@ -1007,7 +1018,7 @@ class Program {
         [JsonPropertyName("r2AccessKeyId")]
         public string R2AccessKeyId { get; set; } = string.Empty;
 
-        [JsonPropertyName("r2secretAccessKey")]
+        [JsonPropertyName("r2SecretAccessKey")]
         public string R2SecretAccessKey { get; set; } = string.Empty;
 
         [JsonPropertyName("r2BucketName")]
