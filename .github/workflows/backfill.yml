@@ -1,0 +1,56 @@
+name: backfill-opendota
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'Select backfill step to run'
+        required: true
+        default: '1_request_parse'
+        type: choice
+        options:
+          - '1_request_parse'
+          - '2_enrich_and_archive'
+
+concurrency:
+  group: dota-tracker-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run-backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Configure AWS Credentials
+        if: ${{ inputs.step == '2_enrich_and_archive' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
+
+      - name: Run Script 1 (Request Parse)
+        if: ${{ inputs.step == '1_request_parse' }}
+        run: dotnet run --project scripts/RequestParse/RequestParse.csproj
+
+      - name: Run Script 2 (Enrich, Archive & Update)
+        if: ${{ inputs.step == '2_enrich_and_archive' }}
+        run: dotnet run --project scripts/EnrichArchive/EnrichArchive.csproj
+
+      - name: Commit and Push Enriched Matches
+        if: ${{ inputs.step == '2_enrich_and_archive' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/matches.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: backfill historical opendota match details" && git push)
