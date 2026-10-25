@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +18,7 @@ using Amazon.S3.Model;
 class Program {
     const string MATCHES_FILE = "data/matches.json";
     const string PROFILE_FILE = "data/profile.json";
+    const int BASE_DELAY_MS = 1500; // 1.5s delay (40 req/min, well under 60 req/min GET limit)
 
     static async Task<int> Main(string[] args) {
         if (!File.Exists(MATCHES_FILE)) {
@@ -32,7 +34,7 @@ class Program {
             .OrderByDescending(m => m.Gc.StartTime)
             .ToList();
 
-        Console.WriteLine($"Found {pendingMatches.Count} matches to enrich and archive.");
+        Console.WriteLine($"Found {pendingMatches.Count} matches pending OpenDota enrichment and archival.");
         if (pendingMatches.Count == 0) return 0;
 
         uint accountId = LoadAccountId();
@@ -66,47 +68,99 @@ class Program {
             ulong mid = match.Gc.MatchId;
             processed++;
 
-            await Task.Delay(1200);
+            bool completed = false;
+            int retryCount = 0;
+            const int maxRetries = 5;
+            bool rateLimitExhausted = false;
 
-            try {
-                var response = await httpClient.GetAsync($"https://api.opendota.com/api/matches/{mid}");
-                if (!response.IsSuccessStatusCode) {
-                    Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: HTTP {(int)response.StatusCode}");
-                    continue;
-                }
+            while (!completed && retryCount < maxRetries) {
+                await Task.Delay(BASE_DELAY_MS);
 
-                string rawJson = await response.Content.ReadAsStringAsync();
+                try {
+                    using var response = await httpClient.GetAsync($"https://api.opendota.com/api/matches/{mid}");
 
-                if (r2Client != null && !string.IsNullOrEmpty(r2Bucket)) {
-                    try {
-                        await UploadToR2Async(r2Client, r2Bucket, mid, rawJson);
-                    } catch (Exception ex) {
-                        Console.Error.WriteLine($"R2 upload failed for {mid}: {ex.Message}");
+                    if (response.IsSuccessStatusCode) {
+                        string rawJson = await response.Content.ReadAsStringAsync();
+
+                        if (r2Client != null && !string.IsNullOrEmpty(r2Bucket)) {
+                            try {
+                                await UploadToR2Async(r2Client, r2Bucket, mid, rawJson);
+                            } catch (Exception ex) {
+                                Console.Error.WriteLine($"R2 upload failed for {mid}: {ex.Message}");
+                            }
+                        }
+
+                        var odData = ParseOpenDotaPayload(rawJson, accountId, match.Gc.HeroId);
+                        if (odData != null) {
+                            match.OpenDota = odData;
+                            enrichedCount++;
+                            Console.WriteLine($"[{processed}/{pendingMatches.Count}] Successfully enriched match {mid}");
+                        } else {
+                            Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: Data parsed but missing target stats.");
+                        }
+
+                        completed = true;
+                        break;
                     }
-                }
 
-                var odData = ParseOpenDotaPayload(rawJson, accountId, match.Gc.HeroId);
-                if (odData != null) {
-                    match.OpenDota = odData;
-                    enrichedCount++;
-                    Console.WriteLine($"[{processed}/{pendingMatches.Count}] Successfully enriched match {mid}");
-                } else {
-                    Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: Data parsed but missing target stats.");
-                }
+                    if (response.StatusCode == HttpStatusCode.TooManyRequests) {
+                        retryCount++;
+                        var waitTime = ResolveRetryDelay(response);
 
-                // Periodic checkpoint every 25 matches
-                if (enrichedCount % 25 == 0 && enrichedCount > 0) {
-                    SaveMatches(matches);
-                    Console.WriteLine($"[Checkpoint] Saved progress ({enrichedCount} matches enriched so far).");
+                        Console.WriteLine($"[Rate Limit] HTTP 429 on match {mid}. Backing off for {waitTime.TotalSeconds:F0}s (Retry {retryCount}/{maxRetries})...");
+                        await Task.Delay(waitTime);
+
+                        if (retryCount >= maxRetries) {
+                            rateLimitExhausted = true;
+                        }
+                        continue;
+                    }
+
+                    // Non-429 error (404, 500, etc.)
+                    Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: HTTP {(int)response.StatusCode}");
+                    completed = true;
+                } catch (Exception ex) {
+                    Console.Error.WriteLine($"Error processing match {mid}: {ex.Message}");
+                    completed = true;
                 }
-            } catch (Exception ex) {
-                Console.Error.WriteLine($"Error processing match {mid}: {ex.Message}");
+            }
+
+            if (rateLimitExhausted) {
+                Console.WriteLine("\n========================================================");
+                Console.WriteLine($"[DAILY QUOTA EXHAUSTED] OpenDota rate limit persisted across {maxRetries} retries.");
+                Console.WriteLine($"Saving progress ({enrichedCount} matches enriched in this run).");
+                Console.WriteLine("Remaining matches will be resumed on the next run.");
+                Console.WriteLine("========================================================\n");
+                SaveMatches(matches);
+                return 0; // Graceful exit so GitHub Actions commits saved progress
+            }
+
+            // Periodic checkpoint every 25 matches
+            if (enrichedCount % 25 == 0 && enrichedCount > 0) {
+                SaveMatches(matches);
             }
         }
 
         SaveMatches(matches);
         Console.WriteLine($"Finished backfill. Total newly enriched matches: {enrichedCount}/{pendingMatches.Count}.");
         return 0;
+    }
+
+    static TimeSpan ResolveRetryDelay(HttpResponseMessage response) {
+        var delay = TimeSpan.FromSeconds(30);
+
+        if (response.Headers.RetryAfter != null) {
+            if (response.Headers.RetryAfter.Delta.HasValue) {
+                delay = response.Headers.RetryAfter.Delta.Value;
+            } else if (response.Headers.RetryAfter.Date.HasValue) {
+                var delta = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
+                if (delta > TimeSpan.Zero) {
+                    delay = delta;
+                }
+            }
+        }
+
+        return delay + TimeSpan.FromSeconds(2);
     }
 
     static async Task UploadToR2Async(IAmazonS3 client, string bucket, ulong matchId, string rawJson) {
@@ -221,7 +275,9 @@ class Program {
                 WithDecryption = true
             });
             if (res.Parameter?.Value != null) {
-                return JsonSerializer.Deserialize<SteamSecrets>(res.Parameter.Value);
+                return JsonSerializer.Deserialize<SteamSecrets>(res.Parameter.Value, new JsonSerializerOptions {
+                    PropertyNameCaseInsensitive = true
+                });
             }
         } catch (Exception ex) {
             Console.WriteLine($"SSM secrets retrieval skipped: {ex.Message}");
@@ -262,6 +318,9 @@ class Program {
         [JsonPropertyName("opendota")]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         public OpenDotaData? OpenDota { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtensionData { get; set; }
     }
 
     public class GcData {
@@ -273,6 +332,21 @@ class Program {
 
         [JsonPropertyName("hero_id")]
         public int HeroId { get; set; }
+
+        [JsonPropertyName("start_mmr")]
+        public int? StartMmr { get; set; }
+
+        [JsonPropertyName("rank_change")]
+        public int? RankChange { get; set; }
+
+        [JsonPropertyName("is_calibration")]
+        public bool? IsCalibration { get; set; }
+
+        [JsonPropertyName("win")]
+        public bool? Win { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtensionData { get; set; }
     }
 
     public class OpenDotaData {
