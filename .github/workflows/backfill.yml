@@ -11,6 +11,10 @@ on:
         options:
           - '1_request_parse'
           - '2_enrich_and_archive'
+      skip:
+        description: 'Number of matches to skip (for resuming)'
+        required: false
+        default: '0'
 
 concurrency:
   group: dota-tracker-sync
@@ -41,7 +45,7 @@ jobs:
 
       - name: Run Script 1 (Request Parse)
         if: ${{ inputs.step == '1_request_parse' }}
-        run: dotnet run --project scripts/RequestParse/RequestParse.csproj
+        run: dotnet run --project scripts/RequestParse/RequestParse.csproj -- ${{ inputs.skip }}
 
       - name: Run Script 2 (Enrich, Archive & Update)
         if: ${{ inputs.step == '2_enrich_and_archive' }}
