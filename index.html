@@ -249,8 +249,9 @@
   <script>
     let chartInstance = null;
 
-    // Helper: Safely resolve end MMR across new schema, calibration, and legacy records
-    function getEndMmr(m) {
+    // Helper: Safely resolve end MMR across nested gc objects and legacy records
+    function getEndMmr(entry) {
+      const m = entry.gc || entry;
       if (typeof m.end_mmr === 'number') return m.end_mmr;
       if (m.is_calibration) return null;
       if (typeof m.start_mmr === 'number' && m.start_mmr > 0) {
@@ -259,8 +260,9 @@
       return null;
     }
 
-    // Helper: Safely resolve win/loss status across new and legacy records
-    function getWinStatus(m) {
+    // Helper: Safely resolve win/loss status across nested gc objects and legacy records
+    function getWinStatus(entry) {
+      const m = entry.gc || entry;
       if (typeof m.win === 'boolean') return m.win;
       return (m.rank_change || 0) > 0;
     }
@@ -290,7 +292,8 @@
         renderChart(matches);
         renderTable(matches);
 
-        lastUpdatedEl.textContent = `Latest Match: ${matches[0].date}`;
+        const latestGc = matches[0].gc || matches[0];
+        lastUpdatedEl.textContent = `Latest Match: ${latestGc.date}`;
       } catch (err) {
         console.error(err);
         tbody.innerHTML = `<tr><td colspan="7" class="error">Error loading data: ${err.message}</td></tr>`;
@@ -320,7 +323,10 @@
     function renderChart(matches) {
       const chronological = [...matches].reverse();
 
-      const labels = chronological.map(m => m.date.split(' ')[0]);
+      const labels = chronological.map(m => {
+        const gc = m.gc || m;
+        return (gc.date || '').split(' ')[0];
+      });
       const data = chronological.map(m => getEndMmr(m));
 
       const ctx = document.getElementById('mmrChart').getContext('2d');
@@ -380,36 +386,37 @@
 
       const displaySubset = matches.slice(0, 100);
 
-      displaySubset.forEach(match => {
+      displaySubset.forEach(entry => {
+        const gc = entry.gc || entry;
         const tr = document.createElement('tr');
 
-        const isWin = getWinStatus(match);
+        const isWin = getWinStatus(entry);
         const outcomeClass = isWin ? 'win' : 'loss';
         const outcomeText = isWin ? 'Won' : 'Lost';
 
         let formattedChange = '—';
-        if (typeof match.rank_change === 'number' && match.rank_change !== 0) {
-          formattedChange = match.rank_change > 0 ? `+${match.rank_change}` : `${match.rank_change}`;
+        if (typeof gc.rank_change === 'number' && gc.rank_change !== 0) {
+          formattedChange = gc.rank_change > 0 ? `+${gc.rank_change}` : `${gc.rank_change}`;
         }
 
-        const endMmr = getEndMmr(match);
+        const endMmr = getEndMmr(entry);
         const finalMmr = endMmr !== null ? endMmr.toLocaleString() : 'Calibrating';
-        const teamClass = match.team === 'radiant' ? 'badge-radiant' : (match.team === 'dire' ? 'badge-dire' : '');
+        const teamClass = gc.team === 'radiant' ? 'badge-radiant' : (gc.team === 'dire' ? 'badge-dire' : '');
 
         tr.innerHTML = `
-          <td>${match.date}</td>
-          <td><strong>${match.hero_name || `Hero ${match.hero_id}`}</strong></td>
+          <td>${gc.date}</td>
+          <td><strong>${gc.hero_name || `Hero ${gc.hero_id}`}</strong></td>
           <td>
             <span class="badge ${teamClass}">
-              ${match.team || '—'}
+              ${gc.team || '—'}
             </span>
           </td>
           <td class="${outcomeClass}">${outcomeText}</td>
           <td class="${outcomeClass}">${formattedChange}</td>
           <td>${finalMmr}</td>
           <td>
-            <a href="https://www.opendota.com/matches/${match.match_id}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">
-              ${match.match_id}
+            <a href="https://www.opendota.com/matches/${gc.match_id}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">
+              ${gc.match_id}
             </a>
           </td>
         `;
