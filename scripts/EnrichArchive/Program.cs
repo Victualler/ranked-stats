@@ -30,7 +30,7 @@ class Program {
         var matches = JsonSerializer.Deserialize<List<MatchEntry>>(matchesJson) ?? new();
 
         var pendingMatches = matches
-            .Where(m => m.OpenDota == null)
+            // .Where(m => m.OpenDota == null)
             .OrderByDescending(m => m.Gc.StartTime)
             .ToList();
 
