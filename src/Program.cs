@@ -296,9 +296,10 @@ class Program {
             foreach (var p in playersProp.EnumerateArray()) {
                 uint? accId = null;
                 if (p.TryGetProperty("account_id", out var aProp) && aProp.ValueKind == JsonValueKind.Number) {
-                    accId = aProp.GetUInt32();
+                    uint val = aProp.GetUInt32();
+                    if (val != 0) accId = val;
                 }
-
+                
                 int hId = p.TryGetProperty("hero_id", out var hProp) && hProp.ValueKind == JsonValueKind.Number
                     ? hProp.GetInt32()
                     : 0;
