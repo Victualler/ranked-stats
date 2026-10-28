@@ -282,9 +282,9 @@ class Program {
             using var doc = JsonDocument.Parse(rawJson);
             var root = doc.RootElement;
 
-            int duration = root.TryGetProperty("duration", out var durProp) && durProp.ValueKind == JsonValueKind.Number
+            int? duration = root.TryGetProperty("duration", out var durProp) && durProp.ValueKind == JsonValueKind.Number
                 ? durProp.GetInt32()
-                : 0;
+                : null;
 
             if (!root.TryGetProperty("players", out var playersProp) || playersProp.ValueKind != JsonValueKind.Array) {
                 return null;
@@ -294,7 +294,7 @@ class Program {
             var playerDrafts = new List<PlayerDraft>();
 
             foreach (var p in playersProp.EnumerateArray()) {
-                uint accId = 0;
+                uint? accId = null;
                 if (p.TryGetProperty("account_id", out var aProp) && aProp.ValueKind == JsonValueKind.Number) {
                     accId = aProp.GetUInt32();
                 }
@@ -346,8 +346,8 @@ class Program {
         }
     }
 
-    static int GetIntSafe(JsonElement elem, string prop) {
-        return elem.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
+    static int? GetIntSafe(JsonElement elem, string prop) {
+        return elem.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -763,9 +763,10 @@ class Program {
                         MatchId = match.match_id,
                         StartTime = match.start_time,
                         HeroId = match.hero_id,
-                        StartMmr = match.previous_rank,
-                        RankChange = match.rank_change,
-                        IsCalibration = isCalib
+                        StartMmr = isCalib ? null : (int)match.previous_rank,
+                        RankChange = isCalib ? null : match.rank_change,
+                        IsCalibration = isCalib,
+                        Win = null
                     },
                     OpenDota = null
                 };
@@ -893,8 +894,7 @@ class Program {
 
     static void SaveMatchesToJson(List<MatchEntry> records, string path) {
         var options = new JsonSerializerOptions {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            WriteIndented = true
         };
         string json = JsonSerializer.Serialize(records, options);
         string tempFile = path + ".tmp";
@@ -1063,7 +1063,7 @@ class Program {
         [JsonPropertyName("is_plus_subscriber")]
         public bool IsPlusSubscriber { get; set; }
 
-        [JsonPropertyName("rank_tier_score")]
+        [JsonPropertyName("rank_tierScore")]
         public uint RankTierScore { get; set; }
 
         [JsonPropertyName("leaderboard_rank_core")]
@@ -1090,48 +1090,48 @@ class Program {
         public int HeroId { get; set; }
 
         [JsonPropertyName("start_mmr")]
-        public uint StartMmr { get; set; }
+        public int? StartMmr { get; set; }
 
         [JsonPropertyName("rank_change")]
-        public int RankChange { get; set; }
+        public int? RankChange { get; set; }
 
         [JsonPropertyName("is_calibration")]
-        public bool IsCalibration { get; set; }
+        public bool? IsCalibration { get; set; }
 
         [JsonPropertyName("win")]
-        public bool Win { get; set; }
+        public bool? Win { get; set; }
     }
 
     public class OpenDotaData {
         [JsonPropertyName("duration")]
-        public int Duration { get; set; }
+        public int? Duration { get; set; }
 
         [JsonPropertyName("level")]
-        public int Level { get; set; }
+        public int? Level { get; set; }
 
         [JsonPropertyName("kills")]
-        public int Kills { get; set; }
+        public int? Kills { get; set; }
 
         [JsonPropertyName("deaths")]
-        public int Deaths { get; set; }
+        public int? Deaths { get; set; }
 
         [JsonPropertyName("assists")]
-        public int Assists { get; set; }
+        public int? Assists { get; set; }
 
         [JsonPropertyName("last_hits")]
-        public int LastHits { get; set; }
+        public int? LastHits { get; set; }
 
         [JsonPropertyName("denies")]
-        public int Denies { get; set; }
+        public int? Denies { get; set; }
 
         [JsonPropertyName("net_worth")]
-        public int NetWorth { get; set; }
+        public int? NetWorth { get; set; }
 
         [JsonPropertyName("gold_per_min")]
-        public int GoldPerMin { get; set; }
+        public int? GoldPerMin { get; set; }
 
         [JsonPropertyName("xp_per_min")]
-        public int XpPerMin { get; set; }
+        public int? XpPerMin { get; set; }
 
         [JsonPropertyName("players")]
         public List<PlayerDraft> Players { get; set; } = new();
@@ -1139,7 +1139,7 @@ class Program {
 
     public class PlayerDraft {
         [JsonPropertyName("account_id")]
-        public uint AccountId { get; set; }
+        public uint? AccountId { get; set; }
 
         [JsonPropertyName("hero_id")]
         public int HeroId { get; set; }
