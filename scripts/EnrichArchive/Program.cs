@@ -84,7 +84,7 @@ class Program {
 
                         if (r2Client != null && !string.IsNullOrEmpty(r2Bucket)) {
                             try {
-                                await UploadToR2Async(r2Client, r2Bucket, mid, rawJson);
+                                await UploadToR2Async(r2Client, r2Bucket, mid, match.Gc, rawJson);
                             } catch (Exception ex) {
                                 Console.Error.WriteLine($"R2 upload failed for {mid}: {ex.Message}");
                             }
@@ -163,8 +163,15 @@ class Program {
         return delay + TimeSpan.FromSeconds(2);
     }
 
-    static async Task UploadToR2Async(IAmazonS3 client, string bucket, ulong matchId, string rawJson) {
-        byte[] bytes = Encoding.UTF8.GetBytes(rawJson);
+    static async Task UploadToR2Async(IAmazonS3 client, string bucket, ulong matchId, GcData gcData, string rawOpenDotaJson) {
+        using var odDoc = JsonDocument.Parse(rawOpenDotaJson);
+        var combinedPayload = new {
+            gc = gcData,
+            opendota = odDoc.RootElement
+        };
+
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(combinedPayload);
+
         using var memoryStream = new MemoryStream();
         using (var gzipStream = new GZipStream(memoryStream, CompressionLevel.Optimal, leaveOpen: true)) {
             await gzipStream.WriteAsync(bytes, 0, bytes.Length);
@@ -176,7 +183,8 @@ class Program {
             Key = $"matches/{matchId}.json.gz",
             InputStream = memoryStream,
             ContentType = "application/json",
-            Headers = { ContentEncoding = "gzip" }
+            Headers = { ContentEncoding = "gzip" },
+            DisablePayloadSigning = true
         });
     }
 
@@ -291,7 +299,9 @@ class Program {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
         string json = JsonSerializer.Serialize(records, options);
-        File.WriteAllText(MATCHES_FILE, json);
+        string tempFile = MATCHES_FILE + ".tmp";
+        File.WriteAllText(tempFile, json);
+        File.Move(tempFile, MATCHES_FILE, overwrite: true);
     }
 
     public class SteamSecrets {
@@ -304,7 +314,7 @@ class Program {
         [JsonPropertyName("r2AccessKeyId")]
         public string R2AccessKeyId { get; set; } = string.Empty;
 
-        [JsonPropertyName("r2secretAccessKey")]
+        [JsonPropertyName("r2SecretAccessKey")]
         public string R2SecretAccessKey { get; set; } = string.Empty;
 
         [JsonPropertyName("r2BucketName")]
