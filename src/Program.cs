@@ -299,7 +299,7 @@ class Program {
                     uint val = aProp.GetUInt32();
                     if (val != 0) accId = val;
                 }
-                
+
                 int hId = p.TryGetProperty("hero_id", out var hProp) && hProp.ValueKind == JsonValueKind.Number
                     ? hProp.GetInt32()
                     : 0;
@@ -922,8 +922,7 @@ class Program {
 
     static void SaveProfileTimelineToJson(List<ProfileBadgeMilestone> timeline, string path) {
         var options = new JsonSerializerOptions {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            WriteIndented = true
         };
         string json = JsonSerializer.Serialize(timeline, options);
         string tempFile = path + ".tmp";
@@ -1064,7 +1063,7 @@ class Program {
         [JsonPropertyName("is_plus_subscriber")]
         public bool IsPlusSubscriber { get; set; }
 
-        [JsonPropertyName("rank_tierScore")]
+        [JsonPropertyName("rank_tier_score")]
         public uint RankTierScore { get; set; }
 
         [JsonPropertyName("leaderboard_rank_core")]
