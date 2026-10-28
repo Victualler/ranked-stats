@@ -189,10 +189,10 @@ class Program {
 
                     string rawJson = await response.Content.ReadAsStringAsync();
 
-                    // Compress in-memory and upload raw payload to R2
+                    // Compress in-memory and upload wrapped GC + OpenDota payload to R2
                     if (r2Client != null && !string.IsNullOrEmpty(r2Bucket)) {
                         try {
-                            await UploadRawMatchToR2Async(r2Client, r2Bucket, mid, rawJson);
+                            await UploadRawMatchToR2Async(r2Client, r2Bucket, mid, match.Gc, rawJson);
                             Console.WriteLine($"Archived raw match {mid}.json.gz to R2.");
                         } catch (Exception ex) {
                             Console.Error.WriteLine($"[R2 Archival Error] Failed to upload match {mid}: {ex.Message}");
@@ -247,8 +247,14 @@ class Program {
     // OpenDota & R2 Archival Helpers
     // -----------------------------------------------------------------------------------------
 
-    static async Task UploadRawMatchToR2Async(IAmazonS3 s3Client, string bucketName, ulong matchId, string rawJson) {
-        byte[] jsonBytes = Encoding.UTF8.GetBytes(rawJson);
+    static async Task UploadRawMatchToR2Async(IAmazonS3 s3Client, string bucketName, ulong matchId, GcData gcData, string rawOpenDotaJson) {
+        using var odDoc = JsonDocument.Parse(rawOpenDotaJson);
+        var combinedPayload = new {
+            gc = gcData,
+            opendota = odDoc.RootElement
+        };
+
+        byte[] jsonBytes = JsonSerializer.SerializeToUtf8Bytes(combinedPayload);
 
         using var memoryStream = new MemoryStream();
         using (var gzipStream = new GZipStream(memoryStream, CompressionLevel.Optimal, leaveOpen: true)) {
@@ -264,7 +270,8 @@ class Program {
             ContentType = "application/json",
             Headers = {
                 ContentEncoding = "gzip"
-            }
+            },
+            DisablePayloadSigning = true
         };
 
         await s3Client.PutObjectAsync(putRequest);
