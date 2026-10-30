@@ -8,40 +8,57 @@
   <link rel="icon" href="favicon.ico">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Ranked Match History</h1>
-      <div id="stats-summary"></div>
-    </header>
+  <div class="layout">
+    <nav class="navbar">
+      <div class="nav-brand">Ranked Tracker</div>
+      <div class="nav-tabs">
+        <a href="#overview" class="nav-item">Overview</a>
+        <a href="#matches" class="nav-item active">Matches</a>
+      </div>
+    </nav>
 
-    <div class="table-wrapper">
-      <table id="matches-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Time</th>
-            <th>Hero</th>
-            <th>MMR</th>
-            <th>Change</th>
-            <th>Duration</th>
-            <th>Draft (Dire / Radiant)</th>
-            <th>LVL</th>
-            <th>K</th>
-            <th>D</th>
-            <th>A</th>
-            <th>LH</th>
-            <th>DN</th>
-            <th>NET</th>
-            <th>GPM</th>
-            <th>XPM</th>
-            <th>Match ID</th>
-          </tr>
-        </thead>
-        <tbody id="matches-body">
-          <!-- Populated by app.js -->
-        </tbody>
-      </table>
-    </div>
+    <main class="content">
+      <div class="controls-bar">
+        <div class="view-title">
+          <h2>Match History</h2>
+          <span id="match-count" class="match-count-badge">0 matches</span>
+        </div>
+        <div class="pagination">
+          <button id="prev-btn" class="btn-page" aria-label="Previous Page">&larr; Prev</button>
+          <span id="page-info" class="page-info">Page 1 of 1</span>
+          <button id="next-btn" class="btn-page" aria-label="Next Page">Next &rarr;</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="matches-table">
+          <thead>
+            <tr>
+              <th class="col-date">Date</th>
+              <th class="col-time group-end">Time</th>
+              <th class="col-hero group-end">Hero</th>
+              <th class="col-mmr">MMR</th>
+              <th class="col-change group-end">Change</th>
+              <th class="col-duration group-end">Duration</th>
+              <th class="col-draft group-end">Draft (Dire / Radiant)</th>
+              <th class="col-lvl group-end">LVL</th>
+              <th class="col-k">K</th>
+              <th class="col-d">D</th>
+              <th class="col-a group-end">A</th>
+              <th class="col-lh">LH</th>
+              <th class="col-dn group-end">DN</th>
+              <th class="col-net group-end">NET</th>
+              <th class="col-gpm">GPM</th>
+              <th class="col-xpm group-end">XPM</th>
+              <th class="col-match">Match ID</th>
+            </tr>
+          </thead>
+          <tbody id="matches-body">
+            <!-- Populated by app.js -->
+          </tbody>
+        </table>
+      </div>
+    </main>
   </div>
 
   <div id="tooltip" class="tooltip hidden"></div>
