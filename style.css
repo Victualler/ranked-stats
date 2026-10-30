@@ -1,0 +1,162 @@
+:root {
+  --bg-color: #0f1215;
+  --surface-color: #171b21;
+  --border-color: #262c36;
+  --text-main: #e1e7ee;
+  --text-muted: #8390a2;
+  --win-tint: rgba(46, 204, 113, 0.08);
+  --win-border: #2ecc71;
+  --loss-tint: rgba(231, 76, 60, 0.08);
+  --loss-border: #e74c3c;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  font-size: 13px;
+}
+
+.container {
+  max-width: 1750px;
+  margin: 0 auto;
+}
+
+header {
+  margin-bottom: 20px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--surface-color);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th {
+  background-color: #13171d;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+/* DOM Rendering Optimization */
+tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 46px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Win / Loss Row Tinting & Left Edge Anchor */
+tbody tr.win {
+  background-color: var(--win-tint);
+}
+tbody tr.win td:first-child {
+  border-left: 3px solid var(--win-border);
+}
+
+tbody tr.loss {
+  background-color: var(--loss-tint);
+}
+tbody tr.loss td:first-child {
+  border-left: 3px solid var(--loss-border);
+}
+
+td {
+  padding: 6px 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Hero Portrait */
+.hero-portrait {
+  width: 48px;
+  height: 27px;
+  border-radius: 2px;
+  display: block;
+  object-fit: cover;
+}
+
+/* Draft 2x5 Grid */
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 20px);
+  grid-template-rows: repeat(2, 20px);
+  gap: 2px;
+  width: max-content;
+}
+
+.draft-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* User hero highlighted with thin white outline */
+.draft-icon.self {
+  border: 1px solid #ffffff;
+}
+
+/* Numbers & Outcomes */
+.val-positive { color: #2ecc71; font-weight: 600; }
+.val-negative { color: #e74c3c; font-weight: 600; }
+.calibration-text { color: #f39c12; font-style: italic; }
+
+/* Match ID & Copy Button */
+.match-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.copy-id {
+  cursor: pointer;
+  font-family: monospace;
+}
+.copy-id:hover {
+  text-decoration: underline;
+  color: #3498db;
+}
+
+.external-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.external-link:hover {
+  color: var(--text-main);
+}
+
+/* Global Floating Tooltip */
+.tooltip {
+  position: fixed;
+  background: rgba(15, 18, 21, 0.95);
+  border: 1px solid var(--border-color);
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+.tooltip.hidden {
+  display: none;
+}
