@@ -11,5 +11,18 @@
     "is_plus_subscriber": false,
     "rank_tier_score": 0,
     "leaderboard_rank_core": 0
+  },
+  {
+    "date": "2026-10-30 00:41:12 UTC",
+    "unix_time": 1793320872,
+    "account_id": 1163162866,
+    "rank_tier": 61,
+    "rank_name": "Ancient 1",
+    "leaderboard_rank": 0,
+    "badge_points": 9260,
+    "lifetime_games": 3556,
+    "is_plus_subscriber": false,
+    "rank_tier_score": 0,
+    "leaderboard_rank_core": 0
   }
 ]
