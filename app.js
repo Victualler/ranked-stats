@@ -1,5 +1,6 @@
 const STEAM_CDN = "https://cdn.cloudflare.steamstatic.com";
 const PAGE_SIZE = 20;
+const numberFormatter = new Intl.NumberFormat("en-US");
 
 let allMatches = [];
 let heroesMap = {};
@@ -15,7 +16,7 @@ async function init() {
     heroesMap = await heroesRes.json();
     allMatches = await matchesRes.json();
 
-    document.getElementById("match-count").textContent = `${allMatches.length} matches`;
+    document.getElementById("match-count").textContent = `${numberFormatter.format(allMatches.length)} matches`;
 
     renderTable();
     setupEventListeners();
@@ -54,51 +55,54 @@ function renderTable() {
 
     // End MMR & Change
     let mmrDisplay = "";
-    let changeDisplay = "";
 
     if (m.gc.is_calibration || m.gc.start_mmr === null) {
       mmrDisplay = `<span class="calibration-text">Calibration</span>`;
-      changeDisplay = "";
     } else {
       const endMmr = m.gc.start_mmr + (m.gc.rank_change || 0);
-      mmrDisplay = endMmr.toString();
+      let changeDisplay = "";
 
       if (m.gc.rank_change > 0) {
         changeDisplay = `<span class="val-positive">+${m.gc.rank_change}</span>`;
       } else if (m.gc.rank_change < 0) {
         changeDisplay = `<span class="val-negative">${m.gc.rank_change}</span>`;
       } else {
-        changeDisplay = `<span style="color:var(--text-muted)">0</span>`;
+        changeDisplay = `<span class="val-neutral">0</span>`;
       }
+
+      mmrDisplay = `<div class="mmr-cell"><span class="mmr-val">${endMmr}</span><span class="mmr-change">${changeDisplay}</span></div>`;
     }
 
     const durationStr = formatDuration(m.opendota?.duration);
     const draftHtml = buildDraftGrid(m.opendota?.players, m.gc.hero_id);
+    const lhdnStr = (m.opendota?.last_hits != null && m.opendota?.denies != null)
+      ? `${m.opendota.last_hits}/${m.opendota.denies}`
+      : "—";
+
+    const gpmxpmStr = (m.opendota?.gold_per_min != null && m.opendota?.xp_per_min != null)
+      ? `${m.opendota.gold_per_min}/${m.opendota.xp_per_min}`
+      : "—";
 
     tr.innerHTML = `
-      <td class="col-date">${dateStr}</td>
-      <td class="col-time group-end">${timeStr}</td>
+      <td class="col-timestamp group-end">${dateStr} ${timeStr}</td>
       <td class="col-hero group-end">
         <img class="hero-portrait" src="${heroImgUrl}" alt="${hero.localized_name}" 
              data-tooltip="${hero.localized_name}" loading="lazy" decoding="async">
       </td>
-      <td class="col-mmr">${mmrDisplay}</td>
-      <td class="col-change group-end">${changeDisplay}</td>
+      <td class="col-mmr group-end">${mmrDisplay}</td>
       <td class="col-duration group-end">${durationStr}</td>
       <td class="col-draft group-end">${draftHtml}</td>
       <td class="col-lvl group-end">${m.opendota?.level ?? "—"}</td>
       <td class="col-k">${m.opendota?.kills ?? "—"}</td>
       <td class="col-d">${m.opendota?.deaths ?? "—"}</td>
       <td class="col-a group-end">${m.opendota?.assists ?? "—"}</td>
-      <td class="col-lh">${m.opendota?.last_hits ?? "—"}</td>
-      <td class="col-dn group-end">${m.opendota?.denies ?? "—"}</td>
-      <td class="col-net group-end">${m.opendota?.net_worth ? m.opendota.net_worth.toLocaleString() : "—"}</td>
-      <td class="col-gpm">${m.opendota?.gold_per_min ?? "—"}</td>
-      <td class="col-xpm group-end">${m.opendota?.xp_per_min ?? "—"}</td>
+      <td class="col-lhdn group-end">${lhdnStr}</td>
+      <td class="col-net group-end">${m.opendota?.net_worth != null ? numberFormatter.format(m.opendota.net_worth) : "—"}</td>
+      <td class="col-gpmxpm group-end">${gpmxpmStr}</td>
       <td class="col-match">
         <div class="match-cell">
           <span class="copy-id" data-mid="${m.gc.match_id}" title="Click to copy">${m.gc.match_id}</span>
-          <a class="external-link" href="https://www.opendota.com/matches/${m.gc.match_id}" target="_blank" rel="noopener">↗</a>
+          <a class="external-link" href="https://www.opendota.com/matches/${m.gc.match_id}" target="_blank" rel="noopener" title="View on OpenDota">↗</a>
         </div>
       </td>
     `;

@@ -86,7 +86,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .view-title {
@@ -97,7 +97,7 @@ body {
 
 .view-title h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -105,9 +105,9 @@ body {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 12px;
 }
 
 .pagination {
@@ -120,9 +120,9 @@ body {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -137,10 +137,15 @@ body {
 }
 
 .page-info {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
-  min-width: 80px;
+  min-width: 90px;
   text-align: center;
+}
+
+.content {
+  width: fit-content;
+  max-width: 100%;
 }
 
 /* Main Table Container */
@@ -149,28 +154,36 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--surface-color);
+  width: fit-content;
+  max-width: 100%;
 }
 
 table {
-  width: 100%;
+  width: auto;
   border-collapse: collapse;
   text-align: left;
   white-space: nowrap;
+  font-size: 14px;
 }
 
 th {
   background-color: var(--header-bg);
-  color: var(--text-muted);
+  color: #fff;
+  font-family: var(--font-sans);
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  padding: 10px 8px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+thead th {
+  color: #fff;
 }
 
 td {
-  padding: 5px 6px;
+  padding: 6px 8px;
   vertical-align: middle;
 }
 
@@ -200,74 +213,89 @@ tbody tr.loss td:first-child {
 /* Group Cluster Dividing Lines */
 .group-end {
   border-right: 1px solid var(--border-subtle);
-  padding-right: 10px !important;
+  padding-right: 14px !important;
 }
 
-/* (Date & Time) Cluster */
-.col-date {
-  padding-right: 2px !important;
-  text-align: left;
+/* Timestamp Column */
+.col-timestamp {
+  text-align: center;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+td.col-timestamp {
   font-family: var(--font-mono);
   color: var(--text-main);
-}
-.col-time {
-  padding-left: 2px !important;
-  text-align: left;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
 }
 
 /* Hero Portrait Column */
 .col-hero {
-  width: 44px;
-  padding-left: 8px !important;
+  text-align: center;
+  width: 48px;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }
 .hero-portrait {
-  width: 42px;
-  height: 24px;
+  width: 48px;
+  height: 28px;
   border-radius: 2px;
   display: block;
+  margin: 0 auto;
   object-fit: cover;
   background-color: #000;
 }
 
-/* (MMR & Change) Cluster */
+/* MMR Column */
 .col-mmr {
-  text-align: right;
-  padding-right: 3px !important;
-  font-family: var(--font-mono);
-  font-weight: 500;
+  text-align: center;
+  padding-left: 9px !important;
+  padding-right: 9px !important;
 }
-.col-change {
-  text-align: left;
-  padding-left: 3px !important;
+td.col-mmr {
   font-family: var(--font-mono);
-  font-size: 11px;
+}
+.mmr-cell {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+.mmr-val {
+  font-weight: 500;
+  color: var(--text-main);
+}
+.mmr-change {
+  font-size: 12px;
 }
 
 /* Duration Column */
 .col-duration {
-  font-family: var(--font-mono);
-  color: var(--text-muted);
   text-align: center;
+  padding-left: 9px !important;
+  padding-right: 9px !important;
+}
+td.col-duration {
+  font-family: var(--font-mono);
+  color: var(--text-main);
 }
 
 /* Draft 2x5 Grid */
 .col-draft {
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  text-align: center;
+  padding-left: 9px !important;
+  padding-right: 9px !important;
 }
 .draft-grid {
   display: grid;
-  grid-template-columns: repeat(5, 18px);
-  grid-template-rows: repeat(2, 18px);
-  gap: 1.5px;
+  grid-template-columns: repeat(5, 21px);
+  grid-template-rows: repeat(2, 21px);
+  gap: 2px;
   width: max-content;
+  margin: 0 auto;
 }
 .draft-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 1px;
+  width: 21px;
+  height: 21px;
+  border-radius: 2px;
   cursor: pointer;
   display: block;
   background-color: #000;
@@ -279,99 +307,125 @@ tbody tr.loss td:first-child {
 /* Level Column */
 .col-lvl {
   text-align: center;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+td.col-lvl {
   font-family: var(--font-mono);
-  color: var(--text-muted);
+  color: var(--text-main);
 }
 
-/* (K, D, A) Cluster */
+/* (K, D, A) Cluster — Solid, uniform color across all three */
 .col-k {
   text-align: right;
-  padding-right: 2px !important;
-  font-family: var(--font-mono);
-  font-weight: 500;
+  padding-right: 3px !important;
 }
 .col-d {
   text-align: center;
-  padding-left: 2px !important;
-  padding-right: 2px !important;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
+  padding-left: 3px !important;
+  padding-right: 3px !important;
 }
 .col-a {
   text-align: left;
-  padding-left: 2px !important;
-  font-family: var(--font-mono);
-  color: var(--text-dim);
-}
-
-/* (LH & DN) Cluster */
-.col-lh {
-  text-align: right;
-  padding-right: 3px !important;
-  font-family: var(--font-mono);
-}
-.col-dn {
-  text-align: left;
   padding-left: 3px !important;
+}
+td.col-k,
+td.col-d,
+td.col-a {
   font-family: var(--font-mono);
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-main);
 }
 
-/* NET Worth Column */
+/* LH/DN Column */
+.col-lhdn {
+  text-align: center;
+  padding-left: 9px !important;
+  padding-right: 9px !important;
+}
+td.col-lhdn {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+/* NET Worth Column — Standard text color */
 .col-net {
-  text-align: right;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+td.col-net {
   font-family: var(--font-mono);
-  font-weight: 500;
-  color: #f1c40f;
+  color: var(--text-main);
 }
 
-/* (GPM & XPM) Cluster */
-.col-gpm {
-  text-align: right;
-  padding-right: 3px !important;
-  font-family: var(--font-mono);
+/* GPM/XPM Column */
+.col-gpmxpm {
+  text-align: center;
+  padding-left: 9px !important;
+  padding-right: 9px !important;
 }
-.col-xpm {
-  text-align: left;
-  padding-left: 3px !important;
+td.col-gpmxpm {
   font-family: var(--font-mono);
-  color: var(--text-muted);
+  color: var(--text-main);
 }
 
 /* Match ID Column */
 .col-match {
-  padding-left: 8px !important;
+  text-align: center;
+  padding-left: 9px !important;
+  padding-right: 10px !important;
 }
 .match-cell {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 7px;
 }
 .copy-id {
   cursor: pointer;
   font-family: var(--font-mono);
-  color: var(--text-muted);
-  font-size: 11px;
+  color: #58a6ff;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
 }
 .copy-id:hover {
   text-decoration: underline;
-  color: #3498db;
+  color: #79b8ff;
 }
 .external-link {
-  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-muted);
   text-decoration: none;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
+  transition: all 0.15s ease;
 }
 .external-link:hover {
-  color: var(--text-main);
+  background-color: rgba(88, 166, 255, 0.12);
+  border-color: #58a6ff;
+  color: #58a6ff;
 }
 
 /* Stat Modifiers */
 .val-positive { color: #2ecc71; font-weight: 600; }
 .val-negative { color: #e74c3c; font-weight: 600; }
-.calibration-text { color: #f39c12; font-style: italic; font-size: 11px; }
+/* Calibration Label — Orange text */
+.calibration-text {
+  color: #f39c12;
+  font-size: 12px;
+  font-weight: 600;
+}
+.val-neutral {
+  color: var(--text-muted);
+}
 
 /* Global Tooltip */
 .tooltip {
@@ -379,8 +433,8 @@ tbody tr.loss td:first-child {
   background: #0f1217;
   border: 1px solid var(--border-color);
   color: #fff;
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 5px 9px;
+  font-size: 12px;
   border-radius: 3px;
   pointer-events: none;
   z-index: 9999;
