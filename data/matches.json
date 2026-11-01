@@ -1,6 +1,381 @@
 [
   {
     "gc": {
+      "match_id": 9070384644,
+      "unix_time": 1793467100,
+      "hero_id": 49,
+      "start_mmr": 3848,
+      "rank_change": 35,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 2523,
+      "level": 26,
+      "kills": 8,
+      "deaths": 7,
+      "assists": 14,
+      "last_hits": 400,
+      "denies": 3,
+      "net_worth": 26912,
+      "gold_per_min": 669,
+      "xp_per_min": 949,
+      "players": [
+        {
+          "account_id": 116788007,
+          "hero_id": 18,
+          "isRadiant": true
+        },
+        {
+          "account_id": 144759165,
+          "hero_id": 55,
+          "isRadiant": true
+        },
+        {
+          "account_id": 104114627,
+          "hero_id": 22,
+          "isRadiant": true
+        },
+        {
+          "account_id": 96863545,
+          "hero_id": 84,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1291861772,
+          "hero_id": 76,
+          "isRadiant": false
+        },
+        {
+          "account_id": 36122397,
+          "hero_id": 87,
+          "isRadiant": false
+        },
+        {
+          "account_id": 135748582,
+          "hero_id": 98,
+          "isRadiant": false
+        },
+        {
+          "account_id": 152284708,
+          "hero_id": 112,
+          "isRadiant": false
+        },
+        {
+          "account_id": 214367235,
+          "hero_id": 6,
+          "isRadiant": false
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9070063190,
+      "unix_time": 1793455580,
+      "hero_id": 33,
+      "start_mmr": 3813,
+      "rank_change": 35,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 2004,
+      "level": 17,
+      "kills": 5,
+      "deaths": 7,
+      "assists": 12,
+      "last_hits": 190,
+      "denies": 13,
+      "net_worth": 17776,
+      "gold_per_min": 535,
+      "xp_per_min": 502,
+      "players": [
+        {
+          "account_id": 122395024,
+          "hero_id": 14,
+          "isRadiant": true
+        },
+        {
+          "account_id": 307844108,
+          "hero_id": 121,
+          "isRadiant": true
+        },
+        {
+          "account_id": 225398117,
+          "hero_id": 135,
+          "isRadiant": true
+        },
+        {
+          "account_id": 897648390,
+          "hero_id": 63,
+          "isRadiant": true
+        },
+        {
+          "account_id": 131206248,
+          "hero_id": 18,
+          "isRadiant": true
+        },
+        {
+          "account_id": 331816578,
+          "hero_id": 28,
+          "isRadiant": false
+        },
+        {
+          "account_id": 164287766,
+          "hero_id": 27,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1730254437,
+          "hero_id": 123,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 33,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1247683479,
+          "hero_id": 6,
+          "isRadiant": false
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9069887330,
+      "unix_time": 1793448791,
+      "hero_id": 49,
+      "start_mmr": 3776,
+      "rank_change": 37,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 2142,
+      "level": 24,
+      "kills": 20,
+      "deaths": 4,
+      "assists": 18,
+      "last_hits": 254,
+      "denies": 5,
+      "net_worth": 25078,
+      "gold_per_min": 746,
+      "xp_per_min": 938,
+      "players": [
+        {
+          "account_id": 129670987,
+          "hero_id": 86,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1233587934,
+          "hero_id": 111,
+          "isRadiant": true
+        },
+        {
+          "account_id": 74207683,
+          "hero_id": 76,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1011394012,
+          "hero_id": 4,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": true
+        },
+        {
+          "account_id": 89610616,
+          "hero_id": 40,
+          "isRadiant": false
+        },
+        {
+          "account_id": 25504922,
+          "hero_id": 60,
+          "isRadiant": false
+        },
+        {
+          "account_id": 129982267,
+          "hero_id": 26,
+          "isRadiant": false
+        },
+        {
+          "account_id": 244751627,
+          "hero_id": 30,
+          "isRadiant": false
+        },
+        {
+          "account_id": 974493599,
+          "hero_id": 1,
+          "isRadiant": false
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9069792190,
+      "unix_time": 1793444475,
+      "hero_id": 49,
+      "start_mmr": 3739,
+      "rank_change": 37,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 2074,
+      "level": 22,
+      "kills": 14,
+      "deaths": 2,
+      "assists": 12,
+      "last_hits": 235,
+      "denies": 9,
+      "net_worth": 21904,
+      "gold_per_min": 644,
+      "xp_per_min": 769,
+      "players": [
+        {
+          "account_id": 1080709141,
+          "hero_id": 1,
+          "isRadiant": true
+        },
+        {
+          "account_id": 133752711,
+          "hero_id": 19,
+          "isRadiant": true
+        },
+        {
+          "account_id": 219297579,
+          "hero_id": 26,
+          "isRadiant": true
+        },
+        {
+          "account_id": 492931610,
+          "hero_id": 111,
+          "isRadiant": true
+        },
+        {
+          "account_id": 481534632,
+          "hero_id": 14,
+          "isRadiant": true
+        },
+        {
+          "account_id": 82829568,
+          "hero_id": 71,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1614588455,
+          "hero_id": 21,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": false
+        },
+        {
+          "account_id": 360967391,
+          "hero_id": 64,
+          "isRadiant": false
+        },
+        {
+          "account_id": 204841428,
+          "hero_id": 8,
+          "isRadiant": false
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9069683930,
+      "unix_time": 1793438619,
+      "hero_id": 33,
+      "start_mmr": 3703,
+      "rank_change": 36,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 3479,
+      "level": 26,
+      "kills": 10,
+      "deaths": 13,
+      "assists": 33,
+      "last_hits": 318,
+      "denies": 5,
+      "net_worth": 27208,
+      "gold_per_min": 576,
+      "xp_per_min": 708,
+      "players": [
+        {
+          "account_id": 173081905,
+          "hero_id": 31,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1060345818,
+          "hero_id": 14,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1584326262,
+          "hero_id": 106,
+          "isRadiant": true
+        },
+        {
+          "account_id": 363500420,
+          "hero_id": 49,
+          "isRadiant": true
+        },
+        {
+          "account_id": 1046016999,
+          "hero_id": 67,
+          "isRadiant": true
+        },
+        {
+          "account_id": 482917243,
+          "hero_id": 121,
+          "isRadiant": false
+        },
+        {
+          "account_id": 382282509,
+          "hero_id": 86,
+          "isRadiant": false
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 33,
+          "isRadiant": false
+        },
+        {
+          "account_id": 63357824,
+          "hero_id": 30,
+          "isRadiant": false
+        },
+        {
+          "account_id": 826437061,
+          "hero_id": 93,
+          "isRadiant": false
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
       "match_id": 9068915002,
       "unix_time": 1793385416,
       "hero_id": 135,
