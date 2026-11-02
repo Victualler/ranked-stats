@@ -3,9 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -17,8 +14,6 @@ using Amazon.S3.Model;
 
 class Program {
     const string MATCHES_FILE = "data/matches.json";
-    const string PROFILE_FILE = "data/profile.json";
-    const int BASE_DELAY_MS = 1500; // 1.5s delay (40 req/min, well under 60 req/min GET limit)
 
     static async Task<int> Main(string[] args) {
         if (!File.Exists(MATCHES_FILE)) {
@@ -28,249 +23,104 @@ class Program {
 
         string matchesJson = await File.ReadAllTextAsync(MATCHES_FILE);
         var matches = JsonSerializer.Deserialize<List<MatchEntry>>(matchesJson) ?? new();
-
-        var pendingMatches = matches
-            // .Where(m => m.OpenDota == null)
-            .OrderByDescending(m => m.Gc.StartTime)
-            .ToList();
-
-        Console.WriteLine($"Found {pendingMatches.Count} matches pending OpenDota enrichment and archival.");
-        if (pendingMatches.Count == 0) return 0;
-
-        uint accountId = LoadAccountId();
-        Console.WriteLine($"Target player Account ID: {(accountId != 0 ? accountId.ToString() : "Not found (using hero fallback)")}");
+        Console.WriteLine($"Loaded {matches.Count} matches from {MATCHES_FILE}.");
 
         var secrets = await LoadSecretsAsync();
         string r2AccountId = secrets?.CloudflareAccountId ?? Environment.GetEnvironmentVariable("CLOUDFLARE_ACCOUNT_ID") ?? string.Empty;
         string r2AccessKey = secrets?.R2AccessKeyId ?? Environment.GetEnvironmentVariable("R2_ACCESS_KEY_ID") ?? string.Empty;
         string r2SecretKey = secrets?.R2SecretAccessKey ?? Environment.GetEnvironmentVariable("R2_SECRET_ACCESS_KEY") ?? string.Empty;
-        string r2Bucket = secrets?.R2BucketName ?? Environment.GetEnvironmentVariable("R2_BUCKET_NAME") ?? string.Empty;
+        string r2Bucket = secrets?.R2BucketName ?? Environment.GetEnvironmentVariable("R2_BUCKET_NAME") ?? "ranked-stats-archive";
 
-        IAmazonS3? r2Client = null;
-        if (!string.IsNullOrEmpty(r2AccountId) && !string.IsNullOrEmpty(r2AccessKey) && !string.IsNullOrEmpty(r2SecretKey)) {
-            r2Client = new AmazonS3Client(r2AccessKey, r2SecretKey, new AmazonS3Config {
-                ServiceURL = $"https://{r2AccountId}.r2.cloudflarestorage.com",
-                AuthenticationRegion = "auto",
-                ForcePathStyle = true
-            });
-            Console.WriteLine($"Connected to Cloudflare R2 bucket: {r2Bucket}");
-        } else {
-            Console.WriteLine("Warning: R2 credentials missing. Archival will be skipped.");
+        if (string.IsNullOrEmpty(r2AccountId) || string.IsNullOrEmpty(r2AccessKey) || string.IsNullOrEmpty(r2SecretKey)) {
+            Console.Error.WriteLine("Error: Missing R2 credentials in SSM/environment variables.");
+            return 1;
         }
 
-        using var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "Dota2Tracker-Backfill/1.0");
+        using var r2Client = new AmazonS3Client(r2AccessKey, r2SecretKey, new AmazonS3Config {
+            ServiceURL = $"https://{r2AccountId}.r2.cloudflarestorage.com",
+            AuthenticationRegion = "auto",
+            ForcePathStyle = true
+        });
+
+        Console.WriteLine($"Connected to R2 bucket '{r2Bucket}'. Re-extracting scores and items from archives...");
 
         int processed = 0;
-        int enrichedCount = 0;
+        int updated = 0;
 
-        foreach (var match in pendingMatches) {
-            ulong mid = match.Gc.MatchId;
+        foreach (var match in matches) {
             processed++;
+            ulong mid = match.Gc.GetProperty("match_id").GetUInt64();
+            string key = $"matches/{mid}.json.gz";
 
-            bool completed = false;
-            int retryCount = 0;
-            const int maxRetries = 5;
-            bool rateLimitExhausted = false;
+            try {
+                using var getResponse = await r2Client.GetObjectAsync(r2Bucket, key);
+                using var gzipStream = new GZipStream(getResponse.ResponseStream, CompressionMode.Decompress);
+                using var doc = await JsonDocument.ParseAsync(gzipStream);
 
-            while (!completed && retryCount < maxRetries) {
-                await Task.Delay(BASE_DELAY_MS);
+                JsonElement odRoot = doc.RootElement.TryGetProperty("opendota", out var odProp)
+                    ? odProp
+                    : doc.RootElement;
 
-                try {
-                    using var response = await httpClient.GetAsync($"https://api.opendota.com/api/matches/{mid}");
+                if (match.OpenDota != null) {
+                    // 1. Team scores
+                    match.OpenDota.RadiantScore = GetIntSafe(odRoot, "radiant_score");
+                    match.OpenDota.DireScore = GetIntSafe(odRoot, "dire_score");
 
-                    if (response.IsSuccessStatusCode) {
-                        string rawJson = await response.Content.ReadAsStringAsync();
+                    // 2. Player items
+                    if (odRoot.TryGetProperty("players", out var playersProp) && playersProp.ValueKind == JsonValueKind.Array) {
+                        var rawPlayers = playersProp.EnumerateArray().ToList();
 
-                        if (r2Client != null && !string.IsNullOrEmpty(r2Bucket)) {
-                            try {
-                                await UploadToR2Async(r2Client, r2Bucket, mid, match.Gc, rawJson);
-                            } catch (Exception ex) {
-                                Console.Error.WriteLine($"R2 upload failed for {mid}: {ex.Message}");
+                        foreach (var targetPlayer in match.OpenDota.Players) {
+                            var raw = rawPlayers.FirstOrDefault(p =>
+                                p.TryGetProperty("hero_id", out var h) &&
+                                h.ValueKind == JsonValueKind.Number &&
+                                h.GetInt32() == targetPlayer.HeroId);
+
+                            if (raw.ValueKind != JsonValueKind.Undefined) {
+                                targetPlayer.Items = new int[] {
+                                    GetIntSafe(raw, "item_0") ?? 0,
+                                    GetIntSafe(raw, "item_1") ?? 0,
+                                    GetIntSafe(raw, "item_2") ?? 0,
+                                    GetIntSafe(raw, "item_3") ?? 0,
+                                    GetIntSafe(raw, "item_4") ?? 0,
+                                    GetIntSafe(raw, "item_5") ?? 0
+                                };
+
+                                targetPlayer.Backpack = new int[] {
+                                    GetIntSafe(raw, "backpack_0") ?? 0,
+                                    GetIntSafe(raw, "backpack_1") ?? 0,
+                                    GetIntSafe(raw, "backpack_2") ?? 0
+                                };
+
+                                int? neutral = GetIntSafe(raw, "item_neutral");
+                                targetPlayer.NeutralItem = (neutral != null && neutral != 0) ? neutral : null;
+
+                                targetPlayer.AghanimsScepter = GetIntSafe(raw, "aghanims_scepter") ?? 0;
+                                targetPlayer.AghanimsShard = GetIntSafe(raw, "aghanims_shard") ?? 0;
+                                targetPlayer.Moonshard = GetIntSafe(raw, "moonshard") ?? 0;
                             }
                         }
-
-                        var odData = ParseOpenDotaPayload(rawJson, accountId, match.Gc.HeroId);
-                        if (odData != null) {
-                            match.OpenDota = odData;
-                            enrichedCount++;
-                            Console.WriteLine($"[{processed}/{pendingMatches.Count}] Successfully enriched match {mid}");
-                        } else {
-                            Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: Data parsed but missing target stats.");
-                        }
-
-                        completed = true;
-                        break;
                     }
 
-                    if (response.StatusCode == HttpStatusCode.TooManyRequests) {
-                        retryCount++;
-                        var waitTime = ResolveRetryDelay(response);
-
-                        Console.WriteLine($"[Rate Limit] HTTP 429 on match {mid}. Backing off for {waitTime.TotalSeconds:F0}s (Retry {retryCount}/{maxRetries})...");
-                        await Task.Delay(waitTime);
-
-                        if (retryCount >= maxRetries) {
-                            rateLimitExhausted = true;
-                        }
-                        continue;
-                    }
-
-                    // Non-429 error (404, 500, etc.)
-                    Console.WriteLine($"[{processed}/{pendingMatches.Count}] Match {mid}: HTTP {(int)response.StatusCode}");
-                    completed = true;
-                } catch (Exception ex) {
-                    Console.Error.WriteLine($"Error processing match {mid}: {ex.Message}");
-                    completed = true;
+                    updated++;
                 }
-            }
 
-            if (rateLimitExhausted) {
-                Console.WriteLine("\n========================================================");
-                Console.WriteLine($"[DAILY QUOTA EXHAUSTED] OpenDota rate limit persisted across {maxRetries} retries.");
-                Console.WriteLine($"Saving progress ({enrichedCount} matches enriched in this run).");
-                Console.WriteLine("Remaining matches will be resumed on the next run.");
-                Console.WriteLine("========================================================\n");
-                SaveMatches(matches);
-                return 0; // Graceful exit so GitHub Actions commits saved progress
-            }
-
-            // Periodic checkpoint every 25 matches
-            if (enrichedCount % 25 == 0 && enrichedCount > 0) {
-                SaveMatches(matches);
+                if (processed % 50 == 0 || processed == matches.Count) {
+                    Console.WriteLine($"[{processed}/{matches.Count}] Processed match archives...");
+                    SaveMatches(matches);
+                }
+            } catch (Exception ex) {
+                Console.Error.WriteLine($"[{processed}/{matches.Count}] Failed reading {key}: {ex.Message}");
             }
         }
 
         SaveMatches(matches);
-        Console.WriteLine($"Finished backfill. Total newly enriched matches: {enrichedCount}/{pendingMatches.Count}.");
+        Console.WriteLine($"\nFinished migration. Successfully enriched {updated}/{matches.Count} matches directly from R2.");
         return 0;
-    }
-
-    static TimeSpan ResolveRetryDelay(HttpResponseMessage response) {
-        var delay = TimeSpan.FromSeconds(30);
-
-        if (response.Headers.RetryAfter != null) {
-            if (response.Headers.RetryAfter.Delta.HasValue) {
-                delay = response.Headers.RetryAfter.Delta.Value;
-            } else if (response.Headers.RetryAfter.Date.HasValue) {
-                var delta = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
-                if (delta > TimeSpan.Zero) {
-                    delay = delta;
-                }
-            }
-        }
-
-        return delay + TimeSpan.FromSeconds(2);
-    }
-
-    static async Task UploadToR2Async(IAmazonS3 client, string bucket, ulong matchId, GcData gcData, string rawOpenDotaJson) {
-        using var odDoc = JsonDocument.Parse(rawOpenDotaJson);
-        var combinedPayload = new {
-            gc = gcData,
-            opendota = odDoc.RootElement
-        };
-
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(combinedPayload);
-
-        using var memoryStream = new MemoryStream();
-        using (var gzipStream = new GZipStream(memoryStream, CompressionLevel.Optimal, leaveOpen: true)) {
-            await gzipStream.WriteAsync(bytes, 0, bytes.Length);
-        }
-        memoryStream.Position = 0;
-
-        await client.PutObjectAsync(new PutObjectRequest {
-            BucketName = bucket,
-            Key = $"matches/{matchId}.json.gz",
-            InputStream = memoryStream,
-            ContentType = "application/json",
-            Headers = { ContentEncoding = "gzip" },
-            DisablePayloadSigning = true
-        });
-    }
-
-    static OpenDotaData? ParseOpenDotaPayload(string rawJson, uint targetAccountId, int fallbackHeroId) {
-        try {
-            using var doc = JsonDocument.Parse(rawJson);
-            var root = doc.RootElement;
-
-            int? duration = root.TryGetProperty("duration", out var durProp) && durProp.ValueKind == JsonValueKind.Number
-                ? durProp.GetInt32()
-                : null;
-
-            if (!root.TryGetProperty("players", out var playersProp) || playersProp.ValueKind != JsonValueKind.Array) {
-                return null;
-            }
-
-            JsonElement? myPlayer = null;
-            var playerDrafts = new List<PlayerDraft>();
-
-            foreach (var p in playersProp.EnumerateArray()) {
-                uint? accId = null;
-                if (p.TryGetProperty("account_id", out var aProp) && aProp.ValueKind == JsonValueKind.Number) {
-                    uint val = aProp.GetUInt32();
-                    if (val != 0) accId = val;
-                }
-
-                int hId = p.TryGetProperty("hero_id", out var hProp) && hProp.ValueKind == JsonValueKind.Number
-                    ? hProp.GetInt32()
-                    : 0;
-
-                bool isRadiant = false;
-                if (p.TryGetProperty("isRadiant", out var rProp) && (rProp.ValueKind == JsonValueKind.True || rProp.ValueKind == JsonValueKind.False)) {
-                    isRadiant = rProp.GetBoolean();
-                } else if (p.TryGetProperty("player_slot", out var slotProp) && slotProp.ValueKind == JsonValueKind.Number) {
-                    isRadiant = slotProp.GetInt32() < 128;
-                }
-
-                playerDrafts.Add(new PlayerDraft {
-                    AccountId = accId,
-                    HeroId = hId,
-                    IsRadiant = isRadiant
-                });
-
-                if ((targetAccountId != 0 && accId == targetAccountId) || (myPlayer == null && hId == fallbackHeroId)) {
-                    myPlayer = p;
-                }
-            }
-
-            if (myPlayer == null) return null;
-            var target = myPlayer.Value;
-
-            return new OpenDotaData {
-                Duration = duration,
-                Level = GetIntSafe(target, "level"),
-                Kills = GetIntSafe(target, "kills"),
-                Deaths = GetIntSafe(target, "deaths"),
-                Assists = GetIntSafe(target, "assists"),
-                LastHits = GetIntSafe(target, "last_hits"),
-                Denies = GetIntSafe(target, "denies"),
-                NetWorth = GetIntSafe(target, "net_worth"),
-                GoldPerMin = GetIntSafe(target, "gold_per_min"),
-                XpPerMin = GetIntSafe(target, "xp_per_min"),
-                Players = playerDrafts
-            };
-        } catch {
-            return null;
-        }
     }
 
     static int? GetIntSafe(JsonElement elem, string prop) {
         return elem.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
-    }
-
-    static uint LoadAccountId() {
-        if (!File.Exists(PROFILE_FILE)) return 0;
-        try {
-            string json = File.ReadAllText(PROFILE_FILE);
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind == JsonValueKind.Array) {
-                var last = doc.RootElement.EnumerateArray().LastOrDefault();
-                if (last.TryGetProperty("account_id", out var p)) return p.GetUInt32();
-            } else if (doc.RootElement.TryGetProperty("account_id", out var p)) {
-                return p.GetUInt32();
-            }
-        } catch { }
-        return 0;
     }
 
     static async Task<SteamSecrets?> LoadSecretsAsync() {
@@ -308,9 +158,6 @@ class Program {
         [JsonPropertyName("cloudflareAccountId")]
         public string CloudflareAccountId { get; set; } = string.Empty;
 
-        [JsonPropertyName("r2Token")]
-        public string R2Token { get; set; } = string.Empty;
-
         [JsonPropertyName("r2AccessKeyId")]
         public string R2AccessKeyId { get; set; } = string.Empty;
 
@@ -323,7 +170,7 @@ class Program {
 
     public class MatchEntry {
         [JsonPropertyName("gc")]
-        public GcData Gc { get; set; } = new();
+        public JsonElement Gc { get; set; }
 
         [JsonPropertyName("opendota")]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
@@ -333,35 +180,15 @@ class Program {
         public Dictionary<string, JsonElement>? ExtensionData { get; set; }
     }
 
-    public class GcData {
-        [JsonPropertyName("match_id")]
-        public ulong MatchId { get; set; }
-
-        [JsonPropertyName("unix_time")]
-        public uint StartTime { get; set; }
-
-        [JsonPropertyName("hero_id")]
-        public int HeroId { get; set; }
-
-        [JsonPropertyName("start_mmr")]
-        public int? StartMmr { get; set; }
-
-        [JsonPropertyName("rank_change")]
-        public int? RankChange { get; set; }
-
-        [JsonPropertyName("is_calibration")]
-        public bool? IsCalibration { get; set; }
-
-        [JsonPropertyName("win")]
-        public bool? Win { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? ExtensionData { get; set; }
-    }
-
     public class OpenDotaData {
         [JsonPropertyName("duration")]
         public int? Duration { get; set; }
+
+        [JsonPropertyName("radiant_score")]
+        public int? RadiantScore { get; set; }
+
+        [JsonPropertyName("dire_score")]
+        public int? DireScore { get; set; }
 
         [JsonPropertyName("level")]
         public int? Level { get; set; }
@@ -403,5 +230,23 @@ class Program {
 
         [JsonPropertyName("isRadiant")]
         public bool IsRadiant { get; set; }
+
+        [JsonPropertyName("items")]
+        public int[] Items { get; set; } = Array.Empty<int>();
+
+        [JsonPropertyName("backpack")]
+        public int[] Backpack { get; set; } = Array.Empty<int>();
+
+        [JsonPropertyName("neutral_item")]
+        public int? NeutralItem { get; set; }
+
+        [JsonPropertyName("aghanims_scepter")]
+        public int AghanimsScepter { get; set; }
+
+        [JsonPropertyName("aghanims_shard")]
+        public int AghanimsShard { get; set; }
+
+        [JsonPropertyName("moonshard")]
+        public int Moonshard { get; set; }
     }
 }
