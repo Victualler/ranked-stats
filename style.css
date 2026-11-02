@@ -372,28 +372,36 @@ td.col-gpmxpm {
 /* Match ID Column */
 .col-match {
   text-align: center;
-  padding-left: 9px !important;
-  padding-right: 10px !important;
+  padding-left: 10px !important;
+  padding-right: 37px !important; /* 10px base padding + 21px link + 6px gap */
 }
 .match-cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  position: relative;
+  vertical-align: baseline;
 }
 .copy-id {
+  position: relative;
   cursor: pointer;
   font-family: var(--font-mono);
   color: #58a6ff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
+  line-height: 1.4;
   transition: color 0.15s ease, text-decoration 0.15s ease;
+  user-select: none;
 }
 .copy-id:hover {
   text-decoration: underline;
   color: #79b8ff;
 }
 .external-link {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -427,7 +435,7 @@ td.col-gpmxpm {
   color: var(--text-muted);
 }
 
-/* Global Tooltip */
+/* Global Lightweight Tooltip */
 .tooltip {
   position: fixed;
   background: #0f1217;
@@ -435,11 +443,312 @@ td.col-gpmxpm {
   color: #fff;
   padding: 5px 9px;
   font-size: 12px;
-  border-radius: 3px;
+  border-radius: 4px;
   pointer-events: none;
-  z-index: 9999;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 10005;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 .tooltip.hidden {
   display: none;
 }
+
+/* Player Card Popover (Persistent & Interactive, scaled ~15%) */
+.player-card-popover {
+  position: fixed;
+  background: #0f1217;
+  border: 1px solid var(--border-color);
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  pointer-events: auto;
+  z-index: 10000;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+}
+.player-card-popover.hidden {
+  display: none;
+}
+
+/* Player Card Layout */
+.player-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 202px;
+}
+
+.player-card-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.player-card-hero-img {
+  width: 51px;
+  height: 29px;
+  border-radius: 2px;
+  object-fit: cover;
+  background-color: #000;
+  flex-shrink: 0;
+}
+
+.player-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.player-card-hero-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-card-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.player-card-faction.radiant {
+  color: #2ecc71;
+  font-weight: 600;
+}
+
+.player-card-faction.dire {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.player-card-acc {
+  color: var(--text-muted);
+}
+
+.player-card-acc.copy-acc-id {
+  position: relative;
+  cursor: pointer;
+  color: #58a6ff;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.player-card-acc.copy-acc-id:hover {
+  text-decoration: underline;
+  color: #79b8ff;
+}
+
+/* Copied! Popup Toast */
+.copied-toast {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #11141a;
+  border: 1px solid #2ecc71;
+  color: #2ecc71;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10020;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+  text-decoration: none !important;
+  font-family: var(--font-sans);
+  animation: toastPop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.copied-toast::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0 4px;
+  border-style: solid;
+  border-color: #2ecc71 transparent transparent transparent;
+}
+
+.copied-toast.hidden {
+  display: none;
+}
+
+@keyframes toastPop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Inventory Layout */
+.player-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.inv-main-area {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.inv-main-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 39px);
+  grid-template-rows: repeat(2, 28px);
+  gap: 3px;
+}
+
+.inv-neutral-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Backpack items: ~33% smaller than regular items (26px x 19px) */
+.inv-backpack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  grid-template-rows: 19px;
+  gap: 3px;
+}
+
+.item-slot {
+  width: 39px;
+  height: 28px;
+  background: #11141a;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.item-slot.empty {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.item-slot.backpack {
+  width: 26px;
+  height: 19px;
+  background: #090c10;
+  border-color: rgba(255, 255, 255, 0.08);
+  opacity: 0.85;
+}
+
+/* Neutral item: no cyan border, standard border, circular shape */
+.item-slot.neutral {
+  border-color: var(--border-color);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  box-shadow: none;
+}
+
+.item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Aghanim's Stack (Scepter on top of Shard, to the right of neutral item) */
+.inv-aghs-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.upgrade-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.upgrade-slot.scepter {
+  width: 25px;
+  height: 25px;
+}
+
+.upgrade-slot.scepter img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.upgrade-slot.shard {
+  width: 27px;
+  height: 15px;
+}
+
+.upgrade-slot.shard img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.upgrade-slot.unlit {
+  opacity: 0.65;
+}
+
+.upgrade-slot.lit {
+  opacity: 1;
+}
+
+/* Backpack & Moon Shard Row (Invariant shape) */
+.inv-sub-area {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 20px;
+}
+
+.buff-slot.moonshard {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid #f59e0b;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.buff-slot.moonshard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
