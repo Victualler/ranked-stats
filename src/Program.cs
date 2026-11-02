@@ -804,9 +804,7 @@ class Program {
                 LeaderboardRank = card.leaderboard_rank,
                 BadgePoints = card.badge_points,
                 LifetimeGames = card.lifetime_games,
-                IsPlusSubscriber = card.is_plus_subscriber,
-                RankTierScore = card.rank_tier_score,
-                LeaderboardRankCore = card.leaderboard_rank_core
+                IsPlusSubscriber = card.is_plus_subscriber
             };
 
             timeline.Add(milestone);
@@ -1186,12 +1184,6 @@ class Program {
 
         [JsonPropertyName("is_plus_subscriber")]
         public bool IsPlusSubscriber { get; set; }
-
-        [JsonPropertyName("rank_tier_score")]
-        public uint RankTierScore { get; set; }
-
-        [JsonPropertyName("leaderboard_rank_core")]
-        public uint LeaderboardRankCore { get; set; }
     }
 
     public class MatchEntry {
