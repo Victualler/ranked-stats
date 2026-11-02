@@ -26,6 +26,7 @@ class Program {
     const string OUTPUT_FILE = "data/matches.json";
     const string PROFILE_FILE = "data/profile.json";
     const string HEROES_FILE = "constants/heroes.json";
+    const string ITEMS_FILE = "constants/items.json";
 
     static SteamClient steamClient = null!;
     static CallbackManager manager = null!;
@@ -64,6 +65,8 @@ class Program {
     static List<MatchEntry> existingMatches = new();
     static Dictionary<ulong, MatchEntry> newMatchRecords = new();
     static Dictionary<int, string> heroIdToName = new();
+    static Dictionary<int, ItemConstant> itemIdToDetails = new();
+    static readonly HashSet<int> unknownItemIds = new();
 
     static async Task<int> Main(string[] args) {
         Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Minimal Stats Sync...");
@@ -71,8 +74,9 @@ class Program {
         Directory.CreateDirectory("constants");
         Directory.CreateDirectory("data");
 
-        // 1. Initialize local hero mapping with on-demand fallback
+        // 1. Initialize local hero and item registries with on-demand remote fallback
         EnsureHeroMapLoaded();
+        EnsureItemMapLoaded();
 
         // 2. Resolve secrets from AWS SSM Parameter Store or Environment Variables
         await LoadCredentialsAsync();
@@ -228,7 +232,6 @@ class Program {
 
             var sortedList = combinedMap.Values.OrderByDescending(m => m.Gc.StartTime).ToList();
 
-            // Monotonic count check: prevent silent data truncation or accidental empty writes
             if (sortedList.Count < existingMatches.Count) {
                 Console.Error.WriteLine($"Integrity check failed: Attempted to save {sortedList.Count} matches, but {existingMatches.Count} previously existed. Aborting write.");
                 return 1;
@@ -268,9 +271,7 @@ class Program {
             Key = $"matches/{matchId}.json.gz",
             InputStream = memoryStream,
             ContentType = "application/json",
-            Headers = {
-                ContentEncoding = "gzip"
-            },
+            Headers = { ContentEncoding = "gzip" },
             DisablePayloadSigning = true
         };
 
@@ -314,32 +315,41 @@ class Program {
                     isRadiant = slotProp.GetInt32() < 128;
                 }
 
+                int[] items = new int[] {
+                    GetIntSafe(p, "item_0") ?? 0,
+                    GetIntSafe(p, "item_1") ?? 0,
+                    GetIntSafe(p, "item_2") ?? 0,
+                    GetIntSafe(p, "item_3") ?? 0,
+                    GetIntSafe(p, "item_4") ?? 0,
+                    GetIntSafe(p, "item_5") ?? 0
+                };
+
+                int[] backpack = new int[] {
+                    GetIntSafe(p, "backpack_0") ?? 0,
+                    GetIntSafe(p, "backpack_1") ?? 0,
+                    GetIntSafe(p, "backpack_2") ?? 0
+                };
+
                 int? neutral = GetIntSafe(p, "item_neutral");
+                int? neutralItemVal = (neutral != null && neutral != 0) ? neutral : null;
+
+                // On-demand registry update for newly introduced items
+                foreach (int it in items) CheckAndRegisterItem(it);
+                foreach (int it in backpack) CheckAndRegisterItem(it);
+                if (neutralItemVal.HasValue) CheckAndRegisterItem(neutralItemVal.Value);
 
                 playerDrafts.Add(new PlayerDraft {
                     AccountId = accId,
                     HeroId = hId,
                     IsRadiant = isRadiant,
-                    Items = new int[] {
-                        GetIntSafe(p, "item_0") ?? 0,
-                        GetIntSafe(p, "item_1") ?? 0,
-                        GetIntSafe(p, "item_2") ?? 0,
-                        GetIntSafe(p, "item_3") ?? 0,
-                        GetIntSafe(p, "item_4") ?? 0,
-                        GetIntSafe(p, "item_5") ?? 0
-                    },
-                    Backpack = new int[] {
-                        GetIntSafe(p, "backpack_0") ?? 0,
-                        GetIntSafe(p, "backpack_1") ?? 0,
-                        GetIntSafe(p, "backpack_2") ?? 0
-                    },
-                    NeutralItem = (neutral != null && neutral != 0) ? neutral : null,
+                    Items = items,
+                    Backpack = backpack,
+                    NeutralItem = neutralItemVal,
                     AghanimsScepter = GetIntSafe(p, "aghanims_scepter") ?? 0,
                     AghanimsShard = GetIntSafe(p, "aghanims_shard") ?? 0,
                     Moonshard = GetIntSafe(p, "moonshard") ?? 0
                 });
 
-                // Match player via account ID, fallback to hero ID if anonymous
                 if ((targetAccountId != 0 && accId == targetAccountId) || (myPlayer == null && hId == fallbackHeroId)) {
                     myPlayer = p;
                 }
@@ -376,7 +386,7 @@ class Program {
     }
 
     // -----------------------------------------------------------------------------------------
-    // Offline-First Hero Mapping
+    // Offline-First Hero & Item Mapping
     // -----------------------------------------------------------------------------------------
 
     static void EnsureHeroMapLoaded() {
@@ -419,6 +429,87 @@ class Program {
                     heroIdToName[heroId] = name;
                 }
             }
+        }
+    }
+
+    static void EnsureItemMapLoaded() {
+        if (File.Exists(ITEMS_FILE)) {
+            try {
+                string json = File.ReadAllText(ITEMS_FILE);
+                using var doc = JsonDocument.Parse(json);
+                itemIdToDetails.Clear();
+
+                foreach (var prop in doc.RootElement.EnumerateObject()) {
+                    if (int.TryParse(prop.Name, out int id)) {
+                        string name = prop.Value.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() ?? "" : "";
+                        string img = prop.Value.TryGetProperty("img", out var im) && im.ValueKind == JsonValueKind.String ? im.GetString() ?? "" : "";
+
+                        itemIdToDetails[id] = new ItemConstant {
+                            Id = id,
+                            Name = name,
+                            Img = img
+                        };
+                    }
+                }
+                Console.WriteLine($"Loaded {itemIdToDetails.Count} items from local {ITEMS_FILE}.");
+            } catch (Exception ex) {
+                Console.WriteLine($"Warning: Failed to parse local {ITEMS_FILE}: {ex.Message}");
+            }
+        }
+
+        if (itemIdToDetails.Count == 0) {
+            Console.WriteLine("No local item definitions found. Fetching initial registry from remote...");
+            UpdateItemMapFromRemote();
+        }
+    }
+
+    static void CheckAndRegisterItem(int itemId) {
+        if (itemId <= 0) return;
+        if (!itemIdToDetails.ContainsKey(itemId) && unknownItemIds.Add(itemId)) {
+            Console.WriteLine($"Encountered unknown item ID {itemId}. Refreshing items registry from remote...");
+            UpdateItemMapFromRemote();
+        }
+    }
+
+    static void UpdateItemMapFromRemote() {
+        try {
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "Dota2Tracker/1.0");
+
+            string rawJson = client.GetStringAsync("https://raw.githubusercontent.com/odota/dotaconstants/master/build/items.json").GetAwaiter().GetResult();
+            using var doc = JsonDocument.Parse(rawJson);
+
+            var freshMap = new Dictionary<string, ItemConstant>();
+
+            foreach (var prop in doc.RootElement.EnumerateObject()) {
+                var itemObj = prop.Value;
+                if (!itemObj.TryGetProperty("id", out var idProp) || idProp.ValueKind != JsonValueKind.Number)
+                    continue;
+
+                int id = idProp.GetInt32();
+                string dname = itemObj.TryGetProperty("dname", out var dn) && dn.ValueKind == JsonValueKind.String
+                    ? dn.GetString() ?? prop.Name
+                    : prop.Name;
+
+                string img = itemObj.TryGetProperty("img", out var im) && im.ValueKind == JsonValueKind.String
+                    ? im.GetString() ?? string.Empty
+                    : string.Empty;
+
+                freshMap[id.ToString()] = new ItemConstant {
+                    Id = id,
+                    Name = dname,
+                    Img = img
+                };
+            }
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string outputJson = JsonSerializer.Serialize(freshMap, options);
+            File.WriteAllText(ITEMS_FILE, outputJson);
+
+            itemIdToDetails = freshMap.ToDictionary(kvp => int.Parse(kvp.Key), kvp => kvp.Value);
+            Console.WriteLine($"Successfully updated {ITEMS_FILE} with {itemIdToDetails.Count} items.");
+        } catch (Exception ex) {
+            Console.WriteLine($"Warning: Failed to update items from remote: {ex.Message}");
         }
     }
 
@@ -662,14 +753,12 @@ class Program {
 
         myAccountId = steamUser.SteamID?.AccountID ?? 0;
 
-        // 1. Request account profile card
         Console.WriteLine("Requesting account profile card...");
         var profileReq = new ClientGCMsgProtobuf<CMsgClientToGCGetProfileCard>(
             (uint)EDOTAGCMsg.k_EMsgClientToGCGetProfileCard);
         profileReq.Body.account_id = myAccountId;
         coordinator.Send(profileReq, APPID);
 
-        // 2. Request match history pagination
         if (matches_count > 0)
             Console.WriteLine($"Requesting up to {matches_count} matches...");
         else
@@ -819,7 +908,7 @@ class Program {
                     CheckSyncCompletion();
                 }
             } else {
-                Thread.Sleep(1000); // Respect GC 1 req/sec rate limit
+                Thread.Sleep(1000);
                 Console.WriteLine($"Fetched page. Next start_at_match_id: {matches_start_at_id}");
                 FetchMatches();
             }
@@ -1026,6 +1115,17 @@ class Program {
     // -----------------------------------------------------------------------------------------
     // Data Models
     // -----------------------------------------------------------------------------------------
+
+    public class ItemConstant {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("img")]
+        public string Img { get; set; } = string.Empty;
+    }
 
     public class SteamSecrets {
         [JsonPropertyName("username")]
