@@ -286,6 +286,9 @@ class Program {
                 ? durProp.GetInt32()
                 : null;
 
+            int? radiantScore = GetIntSafe(root, "radiant_score");
+            int? direScore = GetIntSafe(root, "dire_score");
+
             if (!root.TryGetProperty("players", out var playersProp) || playersProp.ValueKind != JsonValueKind.Array) {
                 return null;
             }
@@ -311,10 +314,29 @@ class Program {
                     isRadiant = slotProp.GetInt32() < 128;
                 }
 
+                int? neutral = GetIntSafe(p, "item_neutral");
+
                 playerDrafts.Add(new PlayerDraft {
                     AccountId = accId,
                     HeroId = hId,
-                    IsRadiant = isRadiant
+                    IsRadiant = isRadiant,
+                    Items = new int[] {
+                        GetIntSafe(p, "item_0") ?? 0,
+                        GetIntSafe(p, "item_1") ?? 0,
+                        GetIntSafe(p, "item_2") ?? 0,
+                        GetIntSafe(p, "item_3") ?? 0,
+                        GetIntSafe(p, "item_4") ?? 0,
+                        GetIntSafe(p, "item_5") ?? 0
+                    },
+                    Backpack = new int[] {
+                        GetIntSafe(p, "backpack_0") ?? 0,
+                        GetIntSafe(p, "backpack_1") ?? 0,
+                        GetIntSafe(p, "backpack_2") ?? 0
+                    },
+                    NeutralItem = (neutral != null && neutral != 0) ? neutral : null,
+                    AghanimsScepter = GetIntSafe(p, "aghanims_scepter") ?? 0,
+                    AghanimsShard = GetIntSafe(p, "aghanims_shard") ?? 0,
+                    Moonshard = GetIntSafe(p, "moonshard") ?? 0
                 });
 
                 // Match player via account ID, fallback to hero ID if anonymous
@@ -331,6 +353,8 @@ class Program {
 
             return new OpenDotaData {
                 Duration = duration,
+                RadiantScore = radiantScore,
+                DireScore = direScore,
                 Level = GetIntSafe(target, "level"),
                 Kills = GetIntSafe(target, "kills"),
                 Deaths = GetIntSafe(target, "deaths"),
@@ -1106,6 +1130,12 @@ class Program {
         [JsonPropertyName("duration")]
         public int? Duration { get; set; }
 
+        [JsonPropertyName("radiant_score")]
+        public int? RadiantScore { get; set; }
+
+        [JsonPropertyName("dire_score")]
+        public int? DireScore { get; set; }
+
         [JsonPropertyName("level")]
         public int? Level { get; set; }
 
@@ -1146,5 +1176,23 @@ class Program {
 
         [JsonPropertyName("isRadiant")]
         public bool IsRadiant { get; set; }
+
+        [JsonPropertyName("items")]
+        public int[] Items { get; set; } = Array.Empty<int>();
+
+        [JsonPropertyName("backpack")]
+        public int[] Backpack { get; set; } = Array.Empty<int>();
+
+        [JsonPropertyName("neutral_item")]
+        public int? NeutralItem { get; set; }
+
+        [JsonPropertyName("aghanims_scepter")]
+        public int AghanimsScepter { get; set; }
+
+        [JsonPropertyName("aghanims_shard")]
+        public int AghanimsShard { get; set; }
+
+        [JsonPropertyName("moonshard")]
+        public int Moonshard { get; set; }
     }
 }
