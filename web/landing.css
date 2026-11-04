@@ -38,62 +38,38 @@ body {
 .layout {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 20px 48px;
+  padding: 20px 20px 48px;
 }
 
 /* ==========================================================================
-   Navigation Bar
+   Global Site Header (Full-width, constant across all pages)
    ========================================================================== */
-.navbar {
+.site-header {
+  width: 100%;
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 24px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 12px;
-  margin-bottom: 24px;
 }
 
-.nav-brand {
+.site-title,
+.site-title:link,
+.site-title:visited,
+.site-title:hover,
+.site-title:active,
+.site-title:focus {
   font-weight: 700;
   font-size: 14px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-}
-
-.nav-brand-link {
   color: var(--text-main);
   text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-.nav-brand-link:hover {
-  color: var(--accent-blue);
-}
-
-.nav-tabs {
-  display: flex;
-  gap: 6px;
-}
-
-.nav-item {
-  color: var(--text-muted);
-  text-decoration: none;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-weight: 500;
-  font-size: 12px;
-  transition: all 0.15s ease;
-}
-
-.nav-item:hover {
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.nav-item.active {
-  color: #fff;
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  transition: none;
 }
 
 /* ==========================================================================

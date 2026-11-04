@@ -21,7 +21,8 @@ async function init() {
     allMatches = await matchesRes.json();
     matchesMap = new Map(allMatches.map(m => [Number(m.gc.match_id), m]));
 
-    document.getElementById("match-count").textContent = `${numberFormatter.format(allMatches.length)} matches`;
+    const countEl = document.getElementById("total-entries-count");
+    if (countEl) countEl.textContent = numberFormatter.format(allMatches.length);
 
     renderTable();
     setupEventListeners();
@@ -80,6 +81,9 @@ function renderTable() {
 
     const durationStr = formatDuration(m.opendota?.duration);
     const draftHtml = buildDraftGrid(m.opendota?.players, m.gc.hero_id, m.gc.match_id);
+    const lvlHtml = m.opendota?.level != null
+      ? `<span class="lvl-badge">${m.opendota.level}</span>`
+      : "—";
     const lhdnStr = (m.opendota?.last_hits != null && m.opendota?.denies != null)
       ? `${m.opendota.last_hits}/${m.opendota.denies}`
       : "—";
@@ -87,6 +91,31 @@ function renderTable() {
     const gpmxpmStr = (m.opendota?.gold_per_min != null && m.opendota?.xp_per_min != null)
       ? `${m.opendota.gold_per_min}/${m.opendota.xp_per_min}`
       : "—";
+
+    const myPlayer = m.opendota?.players?.find(p => p.hero_id === m.gc.hero_id);
+
+    // Endgame inventory (6 main items + 3 backpack items), neutral item & Aghs/Shard
+    const itemsHtml = buildTableItemsHtml(myPlayer?.items, myPlayer?.backpack);
+    const neutralHtml = buildTableNeutralHtml(myPlayer?.neutral_item);
+    const aghsHtml = buildTableAghsHtml(myPlayer);
+
+    // Kill Participation (KP) = (my Kills + my Assists) / My team's score
+    let kpStr = "—";
+    let kpTooltipAttr = "";
+    if (m.opendota && m.opendota.kills != null && m.opendota.assists != null && myPlayer) {
+      const teamScore = myPlayer.isRadiant ? m.opendota.radiant_score : m.opendota.dire_score;
+      if (teamScore != null && teamScore > 0) {
+        const personalKp = m.opendota.kills + m.opendota.assists;
+        const kpRatio = personalKp / teamScore;
+        const kpPercent = Math.round(kpRatio * 100);
+        kpStr = `${kpPercent}%`;
+        kpTooltipAttr = `data-tooltip="${personalKp}/${teamScore}"`;
+      } else if (teamScore === 0) {
+        kpStr = "0%";
+        kpTooltipAttr = `data-tooltip="0/0"`;
+      }
+    }
+    const kpHtml = kpTooltipAttr ? `<span ${kpTooltipAttr}>${kpStr}</span>` : kpStr;
 
     tr.innerHTML = `
       <td class="col-timestamp group-end">${dateStr} ${timeStr}</td>
@@ -97,13 +126,17 @@ function renderTable() {
       <td class="col-mmr group-end">${mmrDisplay}</td>
       <td class="col-duration group-end">${durationStr}</td>
       <td class="col-draft group-end">${draftHtml}</td>
-      <td class="col-lvl group-end">${m.opendota?.level ?? "—"}</td>
+      <td class="col-lvl group-end">${lvlHtml}</td>
       <td class="col-k">${m.opendota?.kills ?? "—"}</td>
       <td class="col-d">${m.opendota?.deaths ?? "—"}</td>
       <td class="col-a group-end">${m.opendota?.assists ?? "—"}</td>
+      <td class="col-kp group-end">${kpHtml}</td>
       <td class="col-lhdn group-end">${lhdnStr}</td>
       <td class="col-net group-end">${m.opendota?.net_worth != null ? numberFormatter.format(m.opendota.net_worth) : "—"}</td>
       <td class="col-gpmxpm group-end">${gpmxpmStr}</td>
+      <td class="col-items">${itemsHtml}</td>
+      <td class="col-neutral">${neutralHtml}</td>
+      <td class="col-aghs group-end">${aghsHtml}</td>
       <td class="col-match">
         <div class="match-cell">
           <span class="copy-id" data-mid="${m.gc.match_id}" data-tooltip="Click to copy">${m.gc.match_id}<span class="copied-toast hidden">Copied!</span></span>
@@ -116,13 +149,37 @@ function renderTable() {
   }
 
   tbody.appendChild(fragment);
-  updatePaginationUI(totalPages);
+  updatePaginationUI(totalPages, totalMatches);
 }
 
-function updatePaginationUI(totalPages) {
-  document.getElementById("page-info").textContent = `Page ${currentPage} of ${totalPages}`;
-  document.getElementById("prev-btn").disabled = currentPage <= 1;
-  document.getElementById("next-btn").disabled = currentPage >= totalPages;
+function updatePaginationUI(totalPages, totalMatches) {
+  document.querySelectorAll(".page-num-display").forEach(el => {
+    el.textContent = currentPage;
+  });
+
+  document.querySelectorAll(".page-num-input").forEach(el => {
+    el.value = currentPage;
+    el.max = totalPages;
+  });
+
+  document.querySelectorAll(".total-pages-display").forEach(el => {
+    el.textContent = totalPages;
+  });
+
+  const isFirst = currentPage <= 1;
+  const isLast = currentPage >= totalPages;
+
+  document.querySelectorAll(".btn-first").forEach(btn => btn.disabled = isFirst);
+  document.querySelectorAll(".btn-prev").forEach(btn => btn.disabled = isFirst);
+  document.querySelectorAll(".btn-next").forEach(btn => btn.disabled = isLast);
+  document.querySelectorAll(".btn-last").forEach(btn => btn.disabled = isLast);
+
+  if (totalMatches != null) {
+    const formatted = numberFormatter.format(totalMatches);
+    document.querySelectorAll(".total-entries-count").forEach(el => {
+      el.textContent = formatted;
+    });
+  }
 }
 
 function formatTimestampDate(dateObj) {
@@ -140,6 +197,87 @@ function formatDuration(seconds) {
   const mStr = m.toString().padStart(2, "0");
   const sStr = s.toString().padStart(2, "0");
   return h > 0 ? `${h}:${mStr}:${sStr}` : `${m}:${sStr}`;
+}
+
+function buildTableItemsHtml(mainItems, backpackItems) {
+  const main = Array.isArray(mainItems) ? mainItems : [];
+  const backpack = Array.isArray(backpackItems) ? backpackItems : [];
+
+  let html = `<div class="table-items-container">`;
+
+  // 6 Main inventory items (39x28px, 2px gap)
+  html += `<div class="table-items-main">`;
+  for (let i = 0; i < 6; i++) {
+    const itemId = main[i];
+    if (!itemId || itemId === 0) {
+      html += `<div class="table-item-slot empty"></div>`;
+    } else {
+      const item = itemsMap[itemId] || { name: `Item #${itemId}`, img: "" };
+      const iconUrl = item.img ? `${STEAM_CDN}${item.img}` : "";
+      html += `
+        <div class="table-item-slot" data-tooltip="${item.name}">
+          ${iconUrl ? `<img class="item-img" src="${iconUrl}" alt="${item.name}" loading="lazy" decoding="async">` : ""}
+        </div>
+      `;
+    }
+  }
+  html += `</div>`;
+
+  // 3 Backpack items (26x19px, 2px gap)
+  html += `<div class="table-items-backpack">`;
+  for (let i = 0; i < 3; i++) {
+    const itemId = backpack[i];
+    if (!itemId || itemId === 0) {
+      html += `<div class="table-item-slot backpack empty"></div>`;
+    } else {
+      const item = itemsMap[itemId] || { name: `Item #${itemId}`, img: "" };
+      const iconUrl = item.img ? `${STEAM_CDN}${item.img}` : "";
+      html += `
+        <div class="table-item-slot backpack" data-tooltip="${item.name}">
+          ${iconUrl ? `<img class="item-img" src="${iconUrl}" alt="${item.name}" loading="lazy" decoding="async">` : ""}
+        </div>
+      `;
+    }
+  }
+  html += `</div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function buildTableNeutralHtml(neutralItemId) {
+  if (!neutralItemId || neutralItemId === 0) {
+    return `<div class="table-neutral-slot empty"></div>`;
+  }
+  const item = itemsMap[neutralItemId] || { name: `Item #${neutralItemId}`, img: "" };
+  const iconUrl = item.img ? `${STEAM_CDN}${item.img}` : "";
+  return `
+    <div class="table-neutral-slot" data-tooltip="${item.name}">
+      ${iconUrl ? `<img class="item-img" src="${iconUrl}" alt="${item.name}" loading="lazy" decoding="async">` : ""}
+    </div>
+  `;
+}
+
+function buildTableAghsHtml(player) {
+  const hasAghs = player?.aghanims_scepter === 1;
+  const hasShard = player?.aghanims_shard === 1;
+
+  const scepterImg = hasAghs ? "../assets/aghanims/scepter_1.png" : "../assets/aghanims/scepter_0.png";
+  const scepterTooltip = "Aghanim's Blessing";
+
+  const shardImg = hasShard ? "../assets/aghanims/shard_1.png" : "../assets/aghanims/shard_0.png";
+  const shardTooltip = "Aghanim's Shard";
+
+  return `
+    <div class="inv-aghs-stack">
+      <div class="upgrade-slot scepter ${hasAghs ? 'lit' : 'unlit'}" data-tooltip="${scepterTooltip}">
+        <img src="${scepterImg}" alt="${scepterTooltip}" loading="lazy" decoding="async">
+      </div>
+      <div class="upgrade-slot shard ${hasShard ? 'lit' : 'unlit'}" data-tooltip="${shardTooltip}">
+        <img src="${shardImg}" alt="${shardTooltip}" loading="lazy" decoding="async">
+      </div>
+    </div>
+  `;
 }
 
 function buildDraftGrid(players, myHeroId, matchId) {
@@ -394,22 +532,96 @@ function setupEventListeners() {
     }
   });
 
-  // Pagination clicks
-  document.getElementById("prev-btn").addEventListener("click", () => {
-    if (currentPage > 1) {
-      currentPage--;
-      renderTable();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  // Pagination navigation clicks (synced across top and bottom controls)
+  document.querySelectorAll(".btn-first").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (currentPage > 1) {
+        currentPage = 1;
+        renderTable();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
   });
 
-  document.getElementById("next-btn").addEventListener("click", () => {
-    const totalPages = Math.ceil(allMatches.length / PAGE_SIZE);
-    if (currentPage < totalPages) {
-      currentPage++;
-      renderTable();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+  document.querySelectorAll(".btn-prev").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderTable();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-next").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const totalPages = Math.ceil(allMatches.length / PAGE_SIZE) || 1;
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderTable();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-last").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const totalPages = Math.ceil(allMatches.length / PAGE_SIZE) || 1;
+      if (currentPage < totalPages) {
+        currentPage = totalPages;
+        renderTable();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  });
+
+  // Direct page number jump (click to enter number, synced across toolbars)
+  const handlePageJump = (rawVal) => {
+    const totalPages = Math.ceil(allMatches.length / PAGE_SIZE) || 1;
+    const val = parseInt(rawVal.trim(), 10);
+    if (!isNaN(val)) {
+      const clamped = Math.max(1, Math.min(val, totalPages));
+      if (clamped !== currentPage) {
+        currentPage = clamped;
+        renderTable();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }
+    document.querySelectorAll(".page-num-input").forEach(input => input.classList.add("hidden"));
+    document.querySelectorAll(".page-num-display").forEach(disp => disp.classList.remove("hidden"));
+    updatePaginationUI(totalPages, allMatches.length);
+  };
+
+  document.querySelectorAll(".page-num-display").forEach(disp => {
+    disp.addEventListener("click", () => {
+      const parent = disp.closest(".page-info");
+      const input = parent?.querySelector(".page-num-input");
+      if (input) {
+        disp.classList.add("hidden");
+        input.classList.remove("hidden");
+        input.value = currentPage;
+        input.focus();
+        input.select();
+        tooltip?.classList.add("hidden");
+      }
+    });
+  });
+
+  document.querySelectorAll(".page-num-input").forEach(input => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handlePageJump(input.value);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        document.querySelectorAll(".page-num-input").forEach(inp => inp.classList.add("hidden"));
+        document.querySelectorAll(".page-num-display").forEach(disp => disp.classList.remove("hidden"));
+      }
+    });
+
+    input.addEventListener("blur", () => {
+      handlePageJump(input.value);
+    });
   });
 
   // Delegated Copy Match ID with dedicated "Copied!" popup

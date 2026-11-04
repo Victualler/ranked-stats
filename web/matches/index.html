@@ -3,30 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dota 2 Ranked Log</title>
+  <title>Ranked Stats</title>
   <link rel="stylesheet" href="matches.css">
   <link rel="icon" href="../assets/favicons/favicon.ico">
 </head>
 <body>
+  <!-- Global Site Header -->
+  <header class="site-header">
+    <a href="../index.html" class="site-title">Ranked Stats</a>
+  </header>
+
   <div class="layout">
-    <nav class="navbar">
-      <div class="nav-brand"><a href="../index.html" class="nav-brand-link">Ranked Stats</a></div>
-      <div class="nav-tabs">
-        <a href="../index.html" class="nav-item">Overview</a>
-        <a href="index.html" class="nav-item active">Matches</a>
-      </div>
-    </nav>
 
     <main class="content">
-      <div class="controls-bar">
-        <div class="view-title">
-          <h2>Match History</h2>
-          <span id="match-count" class="match-count-badge">0 matches</span>
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <div class="total-entries-badge">
+            <span class="entries-label">Rows:</span>
+            <span id="total-entries-count" class="entries-count total-entries-count">0</span>
+          </div>
         </div>
-        <div class="pagination">
-          <button id="prev-btn" class="btn-page" aria-label="Previous Page">&larr; Prev</button>
-          <span id="page-info" class="page-info">Page 1 of 1</span>
-          <button id="next-btn" class="btn-page" aria-label="Next Page">Next &rarr;</button>
+        <div class="toolbar-right">
+          <div class="pagination">
+            <button id="first-btn" class="btn-page btn-first" aria-label="First Page" data-tooltip="First Page">&laquo;</button>
+            <button id="prev-btn" class="btn-page btn-prev" aria-label="Previous Page" data-tooltip="Previous Page">&lsaquo;</button>
+            <div class="page-info">
+              <span>Page</span>
+              <span id="page-num-display" class="page-num-display" data-tooltip="Click to jump to page">1</span>
+              <input type="number" id="page-num-input" class="page-num-input hidden" min="1" max="1" aria-label="Jump to page">
+              <span>of</span>
+              <span id="total-pages-display" class="total-pages-display">1</span>
+            </div>
+            <button id="next-btn" class="btn-page btn-next" aria-label="Next Page" data-tooltip="Next Page">&rsaquo;</button>
+            <button id="last-btn" class="btn-page btn-last" aria-label="Last Page" data-tooltip="Last Page">&raquo;</button>
+          </div>
         </div>
       </div>
 
@@ -43,9 +53,13 @@
               <th class="col-k">K</th>
               <th class="col-d">D</th>
               <th class="col-a group-end">A</th>
+              <th class="col-kp group-end">KP</th>
               <th class="col-lhdn group-end">LH/DN</th>
               <th class="col-net group-end">NET</th>
               <th class="col-gpmxpm group-end">GPM/XPM</th>
+              <th class="col-items">Items</th>
+              <th class="col-neutral"></th>
+              <th class="col-aghs group-end"></th>
               <th class="col-match">Match ID</th>
             </tr>
           </thead>
@@ -53,6 +67,24 @@
             <!-- Populated by matches.js -->
           </tbody>
         </table>
+      </div>
+
+      <div class="table-toolbar bottom">
+        <div class="toolbar-right">
+          <div class="pagination">
+            <button id="first-btn-bottom" class="btn-page btn-first" aria-label="First Page" data-tooltip="First Page">&laquo;</button>
+            <button id="prev-btn-bottom" class="btn-page btn-prev" aria-label="Previous Page" data-tooltip="Previous Page">&lsaquo;</button>
+            <div class="page-info">
+              <span>Page</span>
+              <span id="page-num-display-bottom" class="page-num-display" data-tooltip="Click to jump to page">1</span>
+              <input type="number" id="page-num-input-bottom" class="page-num-input hidden" min="1" max="1" aria-label="Jump to page">
+              <span>of</span>
+              <span id="total-pages-display-bottom" class="total-pages-display">1</span>
+            </div>
+            <button id="next-btn-bottom" class="btn-page btn-next" aria-label="Next Page" data-tooltip="Next Page">&rsaquo;</button>
+            <button id="last-btn-bottom" class="btn-page btn-last" aria-label="Last Page" data-tooltip="Last Page">&raquo;</button>
+          </div>
+        </div>
       </div>
     </main>
   </div>
