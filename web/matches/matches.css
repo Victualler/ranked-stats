@@ -397,31 +397,93 @@ td.col-lvl {
   line-height: 1;
 }
 
-/* (K, D, A) Cluster */
-.col-k {
-  text-align: right;
-  padding-right: 3px !important;
-}
-.col-d {
+/* KDA Cluster & Ratio Line */
+.col-kda {
   text-align: center;
-  padding-left: 3px !important;
-  padding-right: 3px !important;
+  padding-left: 6px !important;
+  padding-right: 14px !important;
+  width: 92px;
 }
-.col-a {
-  text-align: left;
-  padding-left: 3px !important;
+
+.kda-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
 }
+
+.kda-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  margin: 0 auto;
+}
+
+.kda-header span {
+  width: 24px;
+  text-align: center;
+}
+
+.kda-values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  line-height: 1;
+}
+
+.kda-values span {
+  width: 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.kda-k,
 td.col-k {
   font-family: var(--font-mono);
   color: #2ecc71;
 }
+
+.kda-d,
 td.col-d {
   font-family: var(--font-mono);
   color: #e74c3c;
 }
+
+.kda-a,
 td.col-a {
   font-family: var(--font-mono);
   color: #58a6ff;
+}
+
+.kda-bar {
+  display: flex;
+  width: 72px;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 1.5px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.kda-bar-k {
+  background-color: #2ecc71;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.kda-bar-d {
+  background-color: #e74c3c;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.kda-bar-a {
+  background-color: #58a6ff;
+  height: 100%;
+  flex-shrink: 0;
 }
 
 /* KP (Kill Participation) Column */

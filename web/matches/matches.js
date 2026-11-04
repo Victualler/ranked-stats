@@ -117,6 +117,34 @@ function renderTable() {
     }
     const kpHtml = kpTooltipAttr ? `<span ${kpTooltipAttr}>${kpStr}</span>` : kpStr;
 
+    // KDA & Dynamic Ratio Line
+    const kVal = m.opendota?.kills;
+    const dVal = m.opendota?.deaths;
+    const aVal = m.opendota?.assists;
+    const hasKda = kVal != null && dVal != null && aVal != null;
+    let barSegmentsHtml = "";
+    if (hasKda) {
+      const totalKda = kVal + dVal + aVal;
+      if (totalKda > 0) {
+        const kPct = ((kVal / totalKda) * 100).toFixed(1);
+        const dPct = ((dVal / totalKda) * 100).toFixed(1);
+        const aPct = (100 - parseFloat(kPct) - parseFloat(dPct)).toFixed(1);
+        if (kVal > 0) barSegmentsHtml += `<div class="kda-bar-k" style="width:${kPct}%;"></div>`;
+        if (dVal > 0) barSegmentsHtml += `<div class="kda-bar-d" style="width:${dPct}%;"></div>`;
+        if (aVal > 0) barSegmentsHtml += `<div class="kda-bar-a" style="width:${aPct}%;"></div>`;
+      }
+    }
+    const kdaHtml = `
+      <div class="kda-cell">
+        <div class="kda-values">
+          <span class="kda-k">${kVal ?? "—"}</span>
+          <span class="kda-d">${dVal ?? "—"}</span>
+          <span class="kda-a">${aVal ?? "—"}</span>
+        </div>
+        <div class="kda-bar">${barSegmentsHtml}</div>
+      </div>
+    `;
+
     tr.innerHTML = `
       <td class="col-timestamp group-end">${dateStr} ${timeStr}</td>
       <td class="col-hero group-end">
@@ -127,9 +155,7 @@ function renderTable() {
       <td class="col-duration group-end">${durationStr}</td>
       <td class="col-draft group-end">${draftHtml}</td>
       <td class="col-lvl group-end">${lvlHtml}</td>
-      <td class="col-k">${m.opendota?.kills ?? "—"}</td>
-      <td class="col-d">${m.opendota?.deaths ?? "—"}</td>
-      <td class="col-a group-end">${m.opendota?.assists ?? "—"}</td>
+      <td class="col-kda group-end">${kdaHtml}</td>
       <td class="col-kp group-end">${kpHtml}</td>
       <td class="col-lhdn group-end">${lhdnStr}</td>
       <td class="col-net group-end">${m.opendota?.net_worth != null ? numberFormatter.format(m.opendota.net_worth) : "—"}</td>
