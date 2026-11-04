@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranked Stats</title>
+  <link rel="stylesheet" href="landing.css">
+  <link rel="icon" href="assets/favicons/favicon.ico">
+</head>
+<body>
+  <div class="layout">
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+      <div class="nav-brand"><a href="index.html" class="nav-brand-link">Ranked Stats</a></div>
+      <div class="nav-tabs">
+        <a href="index.html" class="nav-item active">Overview</a>
+        <a href="matches/index.html" class="nav-item">Matches</a>
+      </div>
+    </nav>
+
+    <!-- Header Banner & Navigation to Matches -->
+    <header class="hero-banner">
+      <div class="hero-content">
+        <h1 class="hero-title">Ranked Performance Dashboard</h1>
+        <p class="hero-subtitle">MMR progression, comprehensive combat metrics, and historical ranked archive.</p>
+      </div>
+      <div class="hero-action">
+        <a href="matches/index.html" class="btn-cta">
+          <span>View Match History</span>
+          <span class="btn-arrow">&rarr;</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <!-- Component 1: Profile Info -->
+      <section id="profile-component" class="dashboard-card profile-card">
+        <div class="card-header">
+          <div class="card-header-titles">
+            <h2 class="card-title">Profile Info</h2>
+            <span class="card-subtitle">Player identity & rank status</span>
+          </div>
+          <span class="badge status-badge" id="profile-status">Loading...</span>
+        </div>
+        <div class="card-body profile-body">
+          <div class="rank-display">
+            <div class="rank-badge-wrapper" id="rank-badge-wrapper">
+              <img id="rank-base-img" class="rank-badge-base" src="assets/rank_icons/rank_icon_0.png" alt="Rank Badge">
+              <img id="rank-star-img" class="rank-badge-star hidden" src="" alt="Rank Star">
+            </div>
+            <div class="rank-info-text">
+              <div class="rank-title" id="rank-name-label">Uncalibrated</div>
+              <div class="rank-sub" id="profile-account-id">ID: —</div>
+            </div>
+          </div>
+
+          <div class="profile-metrics-list">
+            <div class="profile-metric-box">
+              <span class="metric-label">Current MMR</span>
+              <span class="metric-num val-highlight" id="profile-mmr">—</span>
+            </div>
+            <div class="profile-metric-box">
+              <span class="metric-label">Badge Points</span>
+              <span class="metric-num" id="profile-badge-points">—</span>
+            </div>
+            <div class="profile-metric-box">
+              <span class="metric-label">Lifetime Games</span>
+              <span class="metric-num" id="profile-lifetime-games">—</span>
+            </div>
+            <div class="profile-metric-box">
+              <span class="metric-label">Tracked Matches</span>
+              <span class="metric-num" id="profile-tracked-matches">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Component 2: Chart of MMR Over All Time -->
+      <section id="mmr-chart-component" class="dashboard-card chart-card">
+        <div class="card-header">
+          <div class="card-header-titles">
+            <h2 class="card-title">MMR Over All Time</h2>
+            <span class="card-subtitle">Historical progression across <span id="chart-total-matches">0</span> recorded games</span>
+          </div>
+          <div class="chart-summary-pills">
+            <div class="summary-pill">
+              <span class="pill-label">Peak</span>
+              <span class="pill-value val-positive" id="chart-peak-mmr">—</span>
+            </div>
+            <div class="summary-pill">
+              <span class="pill-label">Lowest</span>
+              <span class="pill-value val-muted" id="chart-min-mmr">—</span>
+            </div>
+            <div class="summary-pill">
+              <span class="pill-label">Net Gain</span>
+              <span class="pill-value val-highlight" id="chart-net-change">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body chart-body">
+          <div class="chart-wrapper" id="chart-container">
+            <svg id="mmr-svg" class="mmr-chart-svg" viewBox="0 0 1000 320" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.32" />
+                  <stop offset="90%" stop-color="#58a6ff" stop-opacity="0.0" />
+                </linearGradient>
+              </defs>
+              <g id="svg-grid-lines"></g>
+              <g id="svg-grid-labels"></g>
+              <path id="svg-chart-area" d="" fill="url(#areaGradient)" />
+              <path id="svg-chart-line" d="" fill="none" stroke="#58a6ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+              <line id="svg-crosshair" class="chart-crosshair hidden" x1="0" y1="20" x2="0" y2="290" />
+              <circle id="svg-active-dot" class="chart-active-dot hidden" cx="0" cy="0" r="4.5" />
+            </svg>
+          </div>
+          <div class="chart-footer">
+            <span id="chart-start-date" class="chart-footer-date">—</span>
+            <span class="chart-footer-hint">Hover along the chart curve to inspect individual matches</span>
+            <span id="chart-end-date" class="chart-footer-date">—</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Component 3: Various Interesting Stats -->
+      <section id="stats-component" class="dashboard-card stats-card">
+        <div class="card-header">
+          <div class="card-header-titles">
+            <h2 class="card-title">Various Interesting Stats</h2>
+            <span class="card-subtitle">Aggregated metrics, records, and combat averages</span>
+          </div>
+        </div>
+        <div class="card-body stats-body">
+          <!-- Quick Stat Metric Tiles -->
+          <div class="stats-row">
+            <!-- Winrate Tile -->
+            <div class="stat-tile">
+              <div class="tile-header">
+                <span class="tile-title">Win Rate</span>
+                <span class="tile-badge" id="stat-record">0W - 0L</span>
+              </div>
+              <div class="tile-main-val" id="stat-winrate">0.0%</div>
+              <div class="winrate-bar-track">
+                <div class="winrate-bar-fill" id="stat-winrate-bar" style="width: 50%;"></div>
+              </div>
+            </div>
+
+            <!-- Streaks Tile -->
+            <div class="stat-tile">
+              <div class="tile-header">
+                <span class="tile-title">Win Streaks</span>
+                <span class="tile-badge" id="stat-streak-badge">Active</span>
+              </div>
+              <div class="streak-split">
+                <div class="streak-item">
+                  <span class="streak-label">Best Streak</span>
+                  <span class="streak-val val-positive" id="stat-max-streak">0W</span>
+                </div>
+                <div class="streak-sep"></div>
+                <div class="streak-item">
+                  <span class="streak-label">Current Streak</span>
+                  <span class="streak-val" id="stat-current-streak">0W</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Combat & Economy Averages -->
+            <div class="stat-tile full-width-sm">
+              <div class="tile-header">
+                <span class="tile-title">Combat & Economy Averages</span>
+                <span class="tile-badge">Per Match</span>
+              </div>
+              <div class="averages-layout">
+                <div class="avg-cell">
+                  <span class="avg-label">Avg K / D / A</span>
+                  <span class="avg-data" id="stat-avg-kda">0 / 0 / 0</span>
+                </div>
+                <div class="avg-cell">
+                  <span class="avg-label">KDA Ratio</span>
+                  <span class="avg-data val-positive" id="stat-kda-ratio">0.00</span>
+                </div>
+                <div class="avg-cell">
+                  <span class="avg-label">Avg GPM / XPM</span>
+                  <span class="avg-data" id="stat-avg-gpmxpm">0 / 0</span>
+                </div>
+                <div class="avg-cell">
+                  <span class="avg-label">Avg Duration</span>
+                  <span class="avg-data" id="stat-avg-duration">0m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Played Heroes Subsection -->
+          <div class="heroes-subsection">
+            <div class="subsection-header">
+              <h3 class="subsection-title">Most Played Heroes</h3>
+              <span class="subsection-sub">Top hero pool by total ranked appearances</span>
+            </div>
+            <div class="top-heroes-grid" id="top-heroes-grid">
+              <!-- Dynamically populated by landing.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Tooltip for Chart & Items -->
+    <div id="chart-tooltip" class="tooltip hidden"></div>
+  </div>
+
+  <script src="landing.js"></script>
+</body>
+</html>

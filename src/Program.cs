@@ -23,10 +23,10 @@ using Amazon.S3.Model;
 
 class Program {
     const int APPID = 570; // Dota 2 AppID
-    const string OUTPUT_FILE = "data/matches.json";
-    const string PROFILE_FILE = "data/profile.json";
-    const string HEROES_FILE = "constants/heroes.json";
-    const string ITEMS_FILE = "constants/items.json";
+    const string OUTPUT_FILE = "web/data/matches.json";
+    const string PROFILE_FILE = "web/data/profile.json";
+    const string HEROES_FILE = "web/constants/heroes.json";
+    const string ITEMS_FILE = "web/constants/items.json";
 
     static SteamClient steamClient = null!;
     static CallbackManager manager = null!;
@@ -71,8 +71,8 @@ class Program {
     static async Task<int> Main(string[] args) {
         Console.WriteLine("Starting Headless Dota 2 MMR Tracker & Minimal Stats Sync...");
 
-        Directory.CreateDirectory("constants");
-        Directory.CreateDirectory("data");
+        Directory.CreateDirectory("web/constants");
+        Directory.CreateDirectory("web/data");
 
         // 1. Initialize local hero and item registries with on-demand remote fallback
         EnsureHeroMapLoaded();

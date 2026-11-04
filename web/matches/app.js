@@ -11,9 +11,9 @@ let currentPage = 1;
 async function init() {
   try {
     const [heroesRes, itemsRes, matchesRes] = await Promise.all([
-      fetch("constants/heroes.json"),
-      fetch("constants/items.json"),
-      fetch("data/matches.json")
+      fetch("../constants/heroes.json"),
+      fetch("../constants/items.json"),
+      fetch("../data/matches.json")
     ]);
 
     heroesMap = await heroesRes.json();
@@ -205,10 +205,10 @@ function buildPlayerCardHtml(matchId, heroId) {
   const hasShard = p.aghanims_shard === 1;
   const hasMoonshard = p.moonshard === 1;
 
-  const scepterImg = hasAghs ? "assets/aghanims/scepter_1.png" : "assets/aghanims/scepter_0.png";
+  const scepterImg = hasAghs ? "../assets/aghanims/scepter_1.png" : "../assets/aghanims/scepter_0.png";
   const scepterTooltip = "Aghanim's Blessing";
 
-  const shardImg = hasShard ? "assets/aghanims/shard_1.png" : "assets/aghanims/shard_0.png";
+  const shardImg = hasShard ? "../assets/aghanims/shard_1.png" : "../assets/aghanims/shard_0.png";
   const shardTooltip = "Aghanim's Shard";
 
   const aghsStackHtml = `

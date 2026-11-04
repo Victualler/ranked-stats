@@ -15,8 +15,8 @@ using Amazon.S3;
 using Amazon.S3.Model;
 
 class Program {
-    const string MATCHES_FILE = "data/matches.json";
-    const string PROFILE_FILE = "data/profile.json";
+    const string MATCHES_FILE = "web/data/matches.json";
+    const string PROFILE_FILE = "web/data/profile.json";
     const int BASE_DELAY_MS = 1500; // 1.5s delay (40 req/min, well under 60 req/min GET limit)
 
     static async Task<int> Main(string[] args) {

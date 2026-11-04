@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 class Program {
-    const string MATCHES_FILE = "data/matches.json";
+    const string MATCHES_FILE = "web/data/matches.json";
     const int BASE_DELAY_MS = 10500; // 10.5s regeneration delay for 10-token parse cost
 
     static async Task<int> Main(string[] args) {
