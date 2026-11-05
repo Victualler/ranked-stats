@@ -20,5 +20,16 @@
     "badge_points": 9260,
     "lifetime_games": 3556,
     "is_plus_subscriber": false
+  },
+  {
+    "date": "2026-11-05 00:41:05 UTC",
+    "unix_time": 1793839265,
+    "account_id": 1163162866,
+    "rank_tier": 62,
+    "rank_name": "Ancient 2",
+    "leaderboard_rank": 0,
+    "badge_points": 9270,
+    "lifetime_games": 3574,
+    "is_plus_subscriber": false
   }
 ]
