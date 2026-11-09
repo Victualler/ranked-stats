@@ -1,6 +1,1241 @@
 [
   {
     "gc": {
+      "match_id": 9081820658,
+      "unix_time": 1794149087,
+      "hero_id": 49,
+      "start_mmr": 3981,
+      "rank_change": -25,
+      "is_calibration": false,
+      "win": false
+    },
+    "opendota": {
+      "duration": 1347,
+      "radiant_score": 36,
+      "dire_score": 6,
+      "level": 11,
+      "kills": 1,
+      "deaths": 6,
+      "assists": 0,
+      "last_hits": 124,
+      "denies": 3,
+      "net_worth": 6780,
+      "gold_per_min": 304,
+      "xp_per_min": 361,
+      "players": [
+        {
+          "account_id": 110389053,
+          "hero_id": 128,
+          "isRadiant": true,
+          "items": [
+            36,
+            1466,
+            0,
+            180,
+            0,
+            0
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1455933737,
+          "hero_id": 67,
+          "isRadiant": true,
+          "items": [
+            137,
+            147,
+            36,
+            63,
+            0,
+            11
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1638,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 206042577,
+          "hero_id": 119,
+          "isRadiant": true,
+          "items": [
+            92,
+            180,
+            43,
+            108,
+            0,
+            0
+          ],
+          "backpack": [
+            188,
+            0,
+            0
+          ],
+          "neutral_item": 1637,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 212043401,
+          "hero_id": 52,
+          "isRadiant": true,
+          "items": [
+            180,
+            1,
+            121,
+            273,
+            41,
+            36
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 577,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 188928961,
+          "hero_id": 104,
+          "isRadiant": true,
+          "items": [
+            36,
+            127,
+            73,
+            116,
+            50,
+            1
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1113582789,
+          "hero_id": 87,
+          "isRadiant": false,
+          "items": [
+            215,
+            180,
+            1848,
+            0,
+            0,
+            0
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 950,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 101470493,
+          "hero_id": 48,
+          "isRadiant": false,
+          "items": [
+            75,
+            63,
+            172,
+            11,
+            0,
+            170
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 950,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 78830129,
+          "hero_id": 9,
+          "isRadiant": false,
+          "items": [
+            29,
+            1852,
+            36,
+            244,
+            23,
+            42
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 378827903,
+          "hero_id": 17,
+          "isRadiant": false,
+          "items": [
+            178,
+            41,
+            36,
+            259,
+            63,
+            0
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 359,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": false,
+          "items": [
+            1,
+            73,
+            16,
+            63,
+            178,
+            34
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9081615602,
+      "unix_time": 1794141902,
+      "hero_id": 49,
+      "start_mmr": 3953,
+      "rank_change": 28,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 2540,
+      "radiant_score": 39,
+      "dire_score": 32,
+      "level": 26,
+      "kills": 14,
+      "deaths": 6,
+      "assists": 14,
+      "last_hits": 332,
+      "denies": 11,
+      "net_worth": 25890,
+      "gold_per_min": 671,
+      "xp_per_min": 984,
+      "players": [
+        {
+          "account_id": 132730605,
+          "hero_id": 39,
+          "isRadiant": true,
+          "items": [
+            96,
+            41,
+            37,
+            123,
+            98,
+            63
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 2190,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 145986994,
+          "hero_id": 31,
+          "isRadiant": true,
+          "items": [
+            214,
+            226,
+            1,
+            36,
+            188,
+            254
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1599,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 176362120,
+          "hero_id": 68,
+          "isRadiant": true,
+          "items": [
+            37,
+            267,
+            180,
+            0,
+            256,
+            0
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1859,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1071604184,
+          "hero_id": 1,
+          "isRadiant": true,
+          "items": [
+            147,
+            208,
+            135,
+            145,
+            63,
+            160
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 950,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": true,
+          "items": [
+            1,
+            98,
+            40,
+            63,
+            235,
+            116
+          ],
+          "backpack": [
+            152,
+            248,
+            0
+          ],
+          "neutral_item": 574,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1047525295,
+          "hero_id": 26,
+          "isRadiant": false,
+          "items": [
+            69,
+            36,
+            254,
+            1,
+            214,
+            0
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1864,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1300511213,
+          "hero_id": 92,
+          "isRadiant": false,
+          "items": [
+            98,
+            81,
+            108,
+            96,
+            931,
+            112
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 971601591,
+          "hero_id": 60,
+          "isRadiant": false,
+          "items": [
+            50,
+            151,
+            1,
+            252,
+            116,
+            178
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 243187312,
+          "hero_id": 94,
+          "isRadiant": false,
+          "items": [
+            63,
+            147,
+            141,
+            0,
+            139,
+            160
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 3826122,
+          "hero_id": 14,
+          "isRadiant": false,
+          "items": [
+            214,
+            21,
+            1,
+            1854,
+            108,
+            36
+          ],
+          "backpack": [
+            8,
+            0,
+            0
+          ],
+          "neutral_item": 1638,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9081471440,
+      "unix_time": 1794136111,
+      "hero_id": 49,
+      "start_mmr": 3925,
+      "rank_change": 28,
+      "is_calibration": false,
+      "win": true
+    },
+    "opendota": {
+      "duration": 3630,
+      "radiant_score": 28,
+      "dire_score": 45,
+      "level": 29,
+      "kills": 2,
+      "deaths": 10,
+      "assists": 18,
+      "last_hits": 704,
+      "denies": 7,
+      "net_worth": 31250,
+      "gold_per_min": 675,
+      "xp_per_min": 936,
+      "players": [
+        {
+          "account_id": 30041805,
+          "hero_id": 35,
+          "isRadiant": true,
+          "items": [
+            263,
+            63,
+            158,
+            1858,
+            141,
+            156
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 1,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": true,
+          "items": [
+            600,
+            250,
+            235,
+            63,
+            108,
+            116
+          ],
+          "backpack": [
+            4206,
+            0,
+            4205
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 114736818,
+          "hero_id": 75,
+          "isRadiant": true,
+          "items": [
+            40,
+            180,
+            254,
+            96,
+            36,
+            110
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1168,
+          "aghanims_scepter": 1,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 103544604,
+          "hero_id": 73,
+          "isRadiant": true,
+          "items": [
+            50,
+            112,
+            147,
+            116,
+            208,
+            137
+          ],
+          "backpack": [
+            4206,
+            0,
+            0
+          ],
+          "neutral_item": 1860,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 84117647,
+          "hero_id": 86,
+          "isRadiant": true,
+          "items": [
+            232,
+            102,
+            256,
+            218,
+            1,
+            180
+          ],
+          "backpack": [
+            36,
+            0,
+            0
+          ],
+          "neutral_item": 1862,
+          "aghanims_scepter": 1,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 166337361,
+          "hero_id": 22,
+          "isRadiant": false,
+          "items": [
+            108,
+            110,
+            147,
+            180,
+            277,
+            1858
+          ],
+          "backpack": [
+            1804,
+            0,
+            0
+          ],
+          "neutral_item": 1864,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 238148379,
+          "hero_id": 55,
+          "isRadiant": false,
+          "items": [
+            231,
+            119,
+            1,
+            110,
+            108,
+            123
+          ],
+          "backpack": [
+            4205,
+            0,
+            0
+          ],
+          "neutral_item": 1862,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 287460870,
+          "hero_id": 42,
+          "isRadiant": false,
+          "items": [
+            1,
+            250,
+            112,
+            116,
+            137,
+            939
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 1,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 159184159,
+          "hero_id": 21,
+          "isRadiant": false,
+          "items": [
+            1,
+            116,
+            267,
+            911,
+            166,
+            29
+          ],
+          "backpack": [
+            0,
+            4206,
+            4206
+          ],
+          "neutral_item": 1860,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 292452412,
+          "hero_id": 14,
+          "isRadiant": false,
+          "items": [
+            100,
+            90,
+            127,
+            1,
+            214,
+            232
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1864,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9081337866,
+      "unix_time": 1794129436,
+      "hero_id": 49,
+      "start_mmr": 3953,
+      "rank_change": -28,
+      "is_calibration": false,
+      "win": false
+    },
+    "opendota": {
+      "duration": 2399,
+      "radiant_score": 44,
+      "dire_score": 29,
+      "level": 21,
+      "kills": 5,
+      "deaths": 10,
+      "assists": 12,
+      "last_hits": 248,
+      "denies": 5,
+      "net_worth": 15509,
+      "gold_per_min": 444,
+      "xp_per_min": 628,
+      "players": [
+        {
+          "account_id": 411214184,
+          "hero_id": 27,
+          "isRadiant": true,
+          "items": [
+            1,
+            102,
+            36,
+            42,
+            1123,
+            180
+          ],
+          "backpack": [
+            188,
+            0,
+            0
+          ],
+          "neutral_item": 2190,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 908744929,
+          "hero_id": 71,
+          "isRadiant": true,
+          "items": [
+            265,
+            152,
+            610,
+            73,
+            50,
+            40
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1643,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 115517715,
+          "hero_id": 98,
+          "isRadiant": true,
+          "items": [
+            29,
+            90,
+            119,
+            108,
+            273,
+            178
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1168,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 874178388,
+          "hero_id": 1,
+          "isRadiant": true,
+          "items": [
+            63,
+            135,
+            147,
+            145,
+            139,
+            123
+          ],
+          "backpack": [
+            4205,
+            0,
+            0
+          ],
+          "neutral_item": 1168,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 359695759,
+          "hero_id": 128,
+          "isRadiant": true,
+          "items": [
+            135,
+            48,
+            116,
+            277,
+            178,
+            1
+          ],
+          "backpack": [
+            41,
+            0,
+            0
+          ],
+          "neutral_item": 840,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 137219498,
+          "hero_id": 76,
+          "isRadiant": false,
+          "items": [
+            123,
+            77,
+            65,
+            63,
+            96,
+            1
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 103544604,
+          "hero_id": 21,
+          "isRadiant": false,
+          "items": [
+            50,
+            149,
+            1,
+            116,
+            36,
+            166
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1605,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": false,
+          "items": [
+            1,
+            98,
+            36,
+            63,
+            1802,
+            116
+          ],
+          "backpack": [
+            4204,
+            0,
+            0
+          ],
+          "neutral_item": 1603,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 191997639,
+          "hero_id": 31,
+          "isRadiant": false,
+          "items": [
+            23,
+            254,
+            218,
+            214,
+            60,
+            216
+          ],
+          "backpack": [
+            38,
+            0,
+            0
+          ],
+          "neutral_item": 1638,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 131847651,
+          "hero_id": 26,
+          "isRadiant": false,
+          "items": [
+            40,
+            1,
+            254,
+            36,
+            60,
+            214
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 675,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
+      "match_id": 9081284543,
+      "unix_time": 1794126507,
+      "hero_id": 49,
+      "start_mmr": 3981,
+      "rank_change": -28,
+      "is_calibration": false,
+      "win": false
+    },
+    "opendota": {
+      "duration": 2080,
+      "radiant_score": 20,
+      "dire_score": 46,
+      "level": 17,
+      "kills": 0,
+      "deaths": 9,
+      "assists": 6,
+      "last_hits": 236,
+      "denies": 4,
+      "net_worth": 11560,
+      "gold_per_min": 398,
+      "xp_per_min": 472,
+      "players": [
+        {
+          "account_id": 1222502410,
+          "hero_id": 48,
+          "isRadiant": true,
+          "items": [
+            63,
+            172,
+            147,
+            75,
+            1,
+            116
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1605,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 272742036,
+          "hero_id": 14,
+          "isRadiant": true,
+          "items": [
+            108,
+            37,
+            73,
+            50,
+            1872,
+            1854
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1640,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1163162866,
+          "hero_id": 49,
+          "isRadiant": true,
+          "items": [
+            1,
+            98,
+            73,
+            63,
+            178,
+            36
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1640,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 86780256,
+          "hero_id": 9,
+          "isRadiant": true,
+          "items": [
+            180,
+            73,
+            236,
+            1076,
+            485,
+            73
+          ],
+          "backpack": [
+            7,
+            0,
+            0
+          ],
+          "neutral_item": 1605,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 151539912,
+          "hero_id": 30,
+          "isRadiant": true,
+          "items": [
+            92,
+            180,
+            42,
+            36,
+            0,
+            1
+          ],
+          "backpack": [
+            188,
+            0,
+            0
+          ],
+          "neutral_item": 1604,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 140911477,
+          "hero_id": 101,
+          "isRadiant": false,
+          "items": [
+            48,
+            77,
+            273,
+            1872,
+            77,
+            108
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 1599,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 1,
+          "moonshard": 0
+        },
+        {
+          "account_id": 328606484,
+          "hero_id": 54,
+          "isRadiant": false,
+          "items": [
+            147,
+            50,
+            137,
+            117,
+            168,
+            108
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 2097,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1230566670,
+          "hero_id": 84,
+          "isRadiant": false,
+          "items": [
+            53,
+            63,
+            108,
+            116,
+            65,
+            1
+          ],
+          "backpack": [
+            40,
+            178,
+            0
+          ],
+          "neutral_item": 1873,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 171266728,
+          "hero_id": 31,
+          "isRadiant": false,
+          "items": [
+            256,
+            73,
+            214,
+            102,
+            0,
+            100
+          ],
+          "backpack": [
+            36,
+            0,
+            0
+          ],
+          "neutral_item": 1859,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        },
+        {
+          "account_id": 1852485267,
+          "hero_id": 97,
+          "isRadiant": false,
+          "items": [
+            939,
+            116,
+            112,
+            1,
+            34,
+            63
+          ],
+          "backpack": [
+            0,
+            0,
+            0
+          ],
+          "neutral_item": 950,
+          "aghanims_scepter": 0,
+          "aghanims_shard": 0,
+          "moonshard": 0
+        }
+      ]
+    }
+  },
+  {
+    "gc": {
       "match_id": 9080431445,
       "unix_time": 1794072424,
       "hero_id": 49,
